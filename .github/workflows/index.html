@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>تال البركة - نظام الحضور والرواتب</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { margin: 0; background: #f9fafb; font-family: system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  #diag { display:none; padding:16px; direction:ltr; text-align:left; white-space:pre-wrap; color:#b91c1c; font-family: monospace; font-size:12px; background:#fef2f2; border:1px solid #fca5a5; margin:12px; border-radius:8px; }
+</style>
+</head>
+<body>
+<div id="loading" style="padding:40px;text-align:center;color:#888;">جاري التحميل...</div>
+<div id="diag"></div>
+<div id="root"></div>
+<script>
+  window.addEventListener("error", function (e) {
+    var d = document.getElementById("diag");
+    d.style.display = "block";
+    d.textContent = "JS ERROR:\n" + (e.message || "") + "\nFile: " + (e.filename || "") + "\nLine: " + (e.lineno || "") + ":" + (e.colno || "") + (e.error && e.error.stack ? "\n\nStack:\n" + e.error.stack : "");
+    var l = document.getElementById("loading");
+    if (l) l.remove();
+  });
+</script>
+<script type="text/babel" data-presets="react" onerror="console.log('babel script error')">
+
+const LOGO = "data:image/jpeg;base64,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";
+
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+function makeIcon(symbol) {
+  return function IconComp({ size = 16, className = "", onClick, style, title }) {
+    return (
+      <span onClick={onClick} title={title} className={`inline-flex items-center justify-center leading-none ${className}`}
+        style={{ fontSize: size, width: size, minWidth: size, lineHeight: 1, ...style }}>
+        {symbol}
+      </span>
+    );
+  };
+}
+const Camera = makeIcon("\uD83D\uDCF7");
+const MapPin = makeIcon("\uD83D\uDCCD");
+const LogOut = makeIcon("\uD83D\uDEAA");
+const X = makeIcon("\u2716");
+const Clock = makeIcon("\uD83D\uDD50");
+const Users = makeIcon("\uD83D\uDC65");
+const Wallet = makeIcon("\uD83D\uDCB0");
+const DollarSign = makeIcon("\uD83D\uDCB5");
+const Settings = makeIcon("\u2699\uFE0F");
+const Plus = makeIcon("\u2795");
+const Trash2 = makeIcon("\uD83D\uDDD1\uFE0F");
+const CheckCircle2 = makeIcon("\u2705");
+const XCircle = makeIcon("\u274C");
+const AlertTriangle = makeIcon("\u26A0\uFE0F");
+const Loader2 = makeIcon("\u23F3");
+const Building2 = makeIcon("\uD83C\uDFE2");
+const CalendarDays = makeIcon("\uD83D\uDCC5");
+const FileBarChart = makeIcon("\uD83D\uDCCA");
+const Mail = makeIcon("\u2709\uFE0F");
+const Lock = makeIcon("\uD83D\uDD12");
+
+// ---------- Firebase ----------
+const FIREBASE_API_KEY = "AIzaSyB6kleNEq_qopMOjtvhtGZKfhf-Ud7OaEk";
+const DB_URL = "https://tal-albaraka-default-rtdb.asia-southeast1.firebasedatabase.app";
+const AUTH_BASE = "https://identitytoolkit.googleapis.com/v1/accounts";
+const REFRESH_BASE = "https://securetoken.googleapis.com/v1/token";
+
+function mapAuthError(code) {
+  const map = {
+    EMAIL_NOT_FOUND: "الإيميل غير مسجل",
+    INVALID_PASSWORD: "كلمة المرور غلط",
+    INVALID_LOGIN_CREDENTIALS: "الإيميل أو كلمة المرور غلط",
+    USER_DISABLED: "الحساب متوقف",
+    EMAIL_EXISTS: "الإيميل مسجل بالفعل لموظف آخر",
+    WEAK_PASSWORD: "كلمة المرور لازم تكون 6 حروف على الأقل",
+    INVALID_EMAIL: "صيغة الإيميل غير صحيحة",
+    TOO_MANY_ATTEMPTS_TRY_LATER: "محاولات كتير غلط، حاول بعد شوية",
+  };
+  return map[code] || "حصل خطأ، حاول تاني";
+}
+async function authSignIn(email, password) {
+  const res = await fetch(`${AUTH_BASE}:signInWithPassword?key=${FIREBASE_API_KEY}`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, returnSecureToken: true }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(mapAuthError(data.error?.message));
+  return data;
+}
+async function authSignUp(email, password) {
+  const res = await fetch(`${AUTH_BASE}:signUp?key=${FIREBASE_API_KEY}`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, returnSecureToken: true }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(mapAuthError(data.error?.message));
+  return data;
+}
+async function authRefresh(refreshToken) {
+  const res = await fetch(`${REFRESH_BASE}?key=${FIREBASE_API_KEY}`, {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error("تعذر تجديد الجلسة");
+  return { idToken: data.id_token, refreshToken: data.refresh_token, expiresIn: data.expires_in };
+}
+async function fbGet(path, token) {
+  const res = await fetch(`${DB_URL}/${path}.json?auth=${token}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+async function fbPut(path, data, token) {
+  await fetch(`${DB_URL}/${path}.json?auth=${token}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+}
+async function fbPatch(path, data, token) {
+  await fetch(`${DB_URL}/${path}.json?auth=${token}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+}
+async function fbDelete(path, token) {
+  await fetch(`${DB_URL}/${path}.json?auth=${token}`, { method: "DELETE" });
+}
+function flattenByUid(obj) {
+  if (!obj) return [];
+  const out = [];
+  Object.keys(obj).forEach((uid) => {
+    const child = obj[uid];
+    if (child && typeof child === "object") {
+      Object.keys(child).forEach((k) => {
+        const rec = child[k];
+        if (rec && typeof rec === "object") out.push({ ...rec, employeeId: uid, id: rec.id || k });
+      });
+    }
+  });
+  return out;
+}
+function objToArray(obj) {
+  if (!obj) return [];
+  return Object.entries(obj).map(([id, v]) => ({ ...v, id }));
+}
+
+// ---------- أدوات عامة ----------
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function nowStr() { return new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }); }
+function fmtMoney(n) { return (Math.round((n || 0) * 100) / 100).toLocaleString("ar-EG"); }
+function daysBetween(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000) + 1; }
+function monthKey(dateStr) { return dateStr.slice(0, 7); }
+function thisYear() { return new Date().getFullYear(); }
+
+const DEFAULT_COMPANY = { companyName: "تال البركة" };
+const DEFAULT_BRANCH = { id: "main", name: "الفرع الرئيسي", lat: 30.0444, lng: 31.2357, radiusMeters: 300 };
+const LEAVE_TYPES = [{ id: "annual", label: "سنوية" }, { id: "sick", label: "مرضية" }, { id: "casual", label: "عارضة" }];
+const ANNUAL_LEAVE_ALLOWANCE = 21;
+
+function Card({ children, className = "" }) { return <div className={`bg-white rounded-2xl border border-gray-200 p-4 ${className}`}>{children}</div>; }
+function Button({ children, onClick, variant = "primary", className = "", disabled, type = "button" }) {
+  const styles = {
+    primary: "bg-teal-600 text-white hover:bg-teal-700",
+    secondary: "bg-gray-100 text-gray-800 hover:bg-gray-200",
+    danger: "bg-red-600 text-white hover:bg-red-700",
+    outline: "border border-gray-300 text-gray-700 hover:bg-gray-50",
+  };
+  return (
+    <button type={type} disabled={disabled} onClick={onClick}
+      className={`px-4 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed ${styles[variant]} ${className}`}>
+      {children}
+    </button>
+  );
+}
+function Badge({ children, tone = "gray" }) {
+  const tones = { gray: "bg-gray-100 text-gray-700", green: "bg-emerald-100 text-emerald-700", red: "bg-red-100 text-red-700", amber: "bg-amber-100 text-amber-700", blue: "bg-blue-100 text-blue-700" };
+  return <span className={`text-xs px-2 py-1 rounded-full font-medium ${tones[tone]}`}>{children}</span>;
+}
+function Logo({ size = 40 }) { return <img src={LOGO} alt="logo" style={{ width: size, height: size }} className="rounded-full object-cover border border-gray-200" />; }
+
+function SelfieCapture({ onCapture, onCancel }) {
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const [error, setError] = useState("");
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+      .then((stream) => { if (!mounted) return; streamRef.current = stream; if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); setReady(true); } })
+      .catch(() => setError("مفيش صلاحية وصول للكاميرا. اسمح للتطبيق بالكاميرا من إعدادات المتصفح."));
+    return () => { mounted = false; if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop()); };
+  }, []);
+  const capture = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement("canvas");
+    const size = 240; canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const vw = video.videoWidth, vh = video.videoHeight, min = Math.min(vw, vh);
+    ctx.drawImage(video, (vw - min) / 2, (vh - min) / 2, min, min, 0, 0, size, size);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
+    if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+    onCapture(dataUrl);
+  };
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl p-4 w-full max-w-xs">
+        <p className="text-sm font-medium mb-3 text-center">التقط صورة سيلفي لتأكيد الحضور</p>
+        {error ? <div className="text-red-600 text-sm text-center py-6">{error}</div> : (
+          <div className="relative w-full aspect-square bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center">
+            <video ref={videoRef} className="w-full h-full object-cover" style={{ transform: "scaleX(-1)" }} muted playsInline />
+            {!ready && <Loader2 className="absolute animate-spin text-gray-400" size={28} />}
+          </div>
+        )}
+        <div className="flex gap-2 mt-4">
+          <Button variant="outline" onClick={onCancel} className="flex-1"><X size={16} /> إلغاء</Button>
+          <Button onClick={capture} disabled={!ready} className="flex-1"><Camera size={16} /> التقاط</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Login({ company, onLogin }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!email || !password) return setError("املأ الإيميل وكلمة المرور");
+    setError(""); setBusy(true);
+    try { await onLogin(email, password); }
+    catch (e) { setError(e.message || "حصل خطأ"); }
+    setBusy(false);
+  };
+  return (
+    <div className="max-w-xs mx-auto pt-10 px-4">
+      <div className="text-center mb-8">
+        <div className="mx-auto mb-3 w-16 h-16"><Logo size={64} /></div>
+        <h1 className="text-lg font-semibold">{company.companyName}</h1>
+        <p className="text-gray-500 text-sm mt-1">نظام الحضور والرواتب — سجّل دخولك للمتابعة</p>
+      </div>
+      <Card className="space-y-3">
+        <div>
+          <label className="text-xs text-gray-500 block mb-1 flex items-center gap-1"><Mail size={12} /> الإيميل</label>
+          <input type="email" dir="ltr" className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1 flex items-center gap-1"><Lock size={12} /> كلمة المرور</label>
+          <input type="password" dir="ltr" className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+        </div>
+        {error && <p className="text-red-600 text-xs">{error}</p>}
+        <Button onClick={submit} disabled={busy} className="w-full">{busy ? "جاري الدخول..." : "دخول"}</Button>
+      </Card>
+      <p className="text-center text-xs text-gray-400 mt-4">لو معندكش حساب، كلم المشرف يضيفك من لوحة التحكم</p>
+    </div>
+  );
+}
+
+function EmployeeDashboard({ user, branch, attendance, advances, leaves, onAddAttendance, onRequestAdvance, onRequestLeave, onLogout }) {
+  const [tab, setTab] = useState("home");
+  const [showCamera, setShowCamera] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+  const [locStatus, setLocStatus] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [advAmount, setAdvAmount] = useState("");
+  const [advInstallments, setAdvInstallments] = useState("3");
+  const [advError, setAdvError] = useState("");
+  const [leaveForm, setLeaveForm] = useState({ type: "annual", start: todayStr(), end: todayStr(), reason: "" });
+  const [leaveError, setLeaveError] = useState("");
+
+  const myAttendance = attendance.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+  const todayRecord = myAttendance.find((a) => a.date === todayStr());
+  const activeAdvance = advances.find((a) => a.status === "approved" && a.remainingInstallments > 0);
+  const usedAnnual = leaves.filter((l) => l.type === "annual" && l.status === "approved" && l.startDate.startsWith(String(thisYear()))).reduce((s, l) => s + l.days, 0);
+
+  const startAction = (type) => {
+    setPendingAction(type); setLocStatus("checking");
+    if (!navigator.geolocation) { setLocStatus({ ok: false, msg: "الجهاز مش بيدعم تحديد الموقع" }); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { const dist = haversineMeters(pos.coords.latitude, pos.coords.longitude, branch.lat, branch.lng); setLocStatus({ ok: dist <= branch.radiusMeters, dist: Math.round(dist), lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+      () => setLocStatus({ ok: false, msg: "لازم تسمح بالوصول لموقعك الجغرافي" }),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+  const proceedToCamera = () => { if (locStatus && locStatus.ok) setShowCamera(true); };
+  const handleCapture = async (dataUrl) => {
+    setShowCamera(false); setBusy(true);
+    await onAddAttendance({ type: pendingAction, selfie: dataUrl, distance: locStatus.dist });
+    setBusy(false); setPendingAction(null); setLocStatus(null);
+  };
+
+  const submitAdvance = async () => {
+    setAdvError("");
+    const amount = parseFloat(advAmount);
+    const installments = parseInt(advInstallments, 10);
+    if (!amount || amount <= 0) return setAdvError("اكتب مبلغ صحيح");
+    if (activeAdvance) return setAdvError("عندك سلفة شغالة لسه بتتقسط");
+    await onRequestAdvance({ amount, installments });
+    setAdvAmount(""); setAdvInstallments("3");
+  };
+  const submitLeave = async () => {
+    setLeaveError("");
+    if (leaveForm.end < leaveForm.start) return setLeaveError("تاريخ النهاية قبل البداية");
+    const days = daysBetween(leaveForm.start, leaveForm.end);
+    if (leaveForm.type === "annual" && usedAnnual + days > ANNUAL_LEAVE_ALLOWANCE) return setLeaveError(`رصيدك السنوي ${ANNUAL_LEAVE_ALLOWANCE} يوم، متبقي ${ANNUAL_LEAVE_ALLOWANCE - usedAnnual} يوم فقط`);
+    await onRequestLeave({ ...leaveForm, days });
+    setLeaveForm({ type: "annual", start: todayStr(), end: todayStr(), reason: "" });
+  };
+  const netSalary = () => user.baseSalary - (activeAdvance ? activeAdvance.installmentAmount : 0);
+
+  return (
+    <div className="max-w-xs mx-auto pb-6">
+      {showCamera && <SelfieCapture onCapture={handleCapture} onCancel={() => { setShowCamera(false); setPendingAction(null); setLocStatus(null); }} />}
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <div className="flex items-center gap-2"><Logo size={36} /><div><p className="font-semibold text-sm">{user.name}</p><p className="text-xs text-gray-500">{branch?.name}</p></div></div>
+        <button onClick={onLogout} className="text-gray-400 p-2"><LogOut size={18} /></button>
+      </div>
+      <div className="flex gap-1 px-4 mb-3 flex-wrap">
+        {[["home", "الرئيسية"], ["advances", "السلف"], ["leaves", "الإجازات"], ["salary", "الراتب"]].map(([k, label]) => (
+          <button key={k} onClick={() => setTab(k)} className={`flex-1 text-xs py-2 rounded-lg font-medium ${tab === k ? "bg-teal-600 text-white" : "bg-gray-100 text-gray-600"}`}>{label}</button>
+        ))}
+      </div>
+
+      {tab === "home" && (
+        <div className="px-4 space-y-3">
+          <Card>
+            <p className="text-xs text-gray-500 mb-2">حضور اليوم — {todayStr()}</p>
+            <div className="flex items-center justify-between text-sm mb-3">
+              <span>تسجيل دخول: {todayRecord?.checkInTime || "—"}</span><span>تسجيل انصراف: {todayRecord?.checkOutTime || "—"}</span>
+            </div>
+            {!pendingAction && (
+              <div className="grid grid-cols-2 gap-2">
+                <Button onClick={() => startAction("in")} disabled={!!todayRecord?.checkInTime} className="text-xs"><Clock size={14} /> حضور</Button>
+                <Button variant="secondary" onClick={() => startAction("out")} disabled={!todayRecord?.checkInTime || !!todayRecord?.checkOutTime} className="text-xs"><Clock size={14} /> انصراف</Button>
+              </div>
+            )}
+            {pendingAction && (
+              <div className="border-t border-gray-100 pt-3 mt-1 space-y-2">
+                {locStatus === "checking" && <p className="text-xs text-gray-500 flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> بنتأكد من موقعك...</p>}
+                {locStatus && locStatus !== "checking" && locStatus.ok && (<>
+                  <p className="text-xs text-teal-700 flex items-center gap-1"><MapPin size={14} /> موقعك داخل النطاق ({locStatus.dist} متر)</p>
+                  <Button onClick={proceedToCamera} className="w-full text-xs"><Camera size={14} /> التقط سيلفي وأكّد {pendingAction === "in" ? "الحضور" : "الانصراف"}</Button>
+                </>)}
+                {locStatus && locStatus !== "checking" && !locStatus.ok && (
+                  <p className="text-xs text-red-600 flex items-center gap-1"><AlertTriangle size={14} /> {locStatus.msg || `أنت بعيد عن موقع العمل (${locStatus.dist} متر). لازم تكون في نطاق ${branch.radiusMeters} متر.`}</p>
+                )}
+                <button onClick={() => { setPendingAction(null); setLocStatus(null); }} className="text-xs text-gray-400 underline">إلغاء</button>
+              </div>
+            )}
+            {busy && <p className="text-xs text-gray-400 mt-2">جاري الحفظ...</p>}
+          </Card>
+          <Card>
+            <p className="text-xs text-gray-500 mb-2">آخر أيام الحضور</p>
+            <div className="space-y-2">
+              {myAttendance.slice(0, 5).map((r) => (<div key={r.id} className="flex justify-between text-xs border-b border-gray-50 pb-1.5"><span className="text-gray-500">{r.date}</span><span>{r.checkInTime || "—"} → {r.checkOutTime || "—"}</span></div>))}
+              {myAttendance.length === 0 && <p className="text-xs text-gray-400">مفيش سجلات لسه</p>}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {tab === "advances" && (
+        <div className="px-4 space-y-3">
+          <Card>
+            <p className="text-sm font-medium mb-3">طلب سلفة جديدة</p>
+            <div className="space-y-2">
+              <input type="number" placeholder="المبلغ (جنيه)" value={advAmount} onChange={(e) => setAdvAmount(e.target.value)} className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm" />
+              <select value={advInstallments} onChange={(e) => setAdvInstallments(e.target.value)} className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm">
+                {[1,2,3,4,5,6,9,12].map((n) => <option key={n} value={n}>{n} أقساط</option>)}
+              </select>
+              {advAmount && advInstallments && <p className="text-xs text-gray-500">قسط شهري تقريبي: {fmtMoney(parseFloat(advAmount || 0) / parseInt(advInstallments || 1))} جنيه</p>}
+              {advError && <p className="text-red-600 text-xs">{advError}</p>}
+              <Button onClick={submitAdvance} className="w-full text-sm"><Plus size={16} /> إرسال الطلب للمشرف</Button>
+            </div>
+          </Card>
+          <Card>
+            <p className="text-sm font-medium mb-3">طلباتي</p>
+            <div className="space-y-2">
+              {advances.map((a) => (
+                <div key={a.id} className="flex items-center justify-between border-b border-gray-50 pb-2 text-xs">
+                  <div><p className="font-medium">{fmtMoney(a.amount)} جنيه</p><p className="text-gray-500">{a.installmentsCount} أقساط · متبقي {a.remainingInstallments}</p></div>
+                  <Badge tone={a.status === "approved" ? "green" : a.status === "rejected" ? "red" : "amber"}>{a.status === "approved" ? "موافق عليها" : a.status === "rejected" ? "مرفوضة" : "قيد المراجعة"}</Badge>
+                </div>
+              ))}
+              {advances.length === 0 && <p className="text-xs text-gray-400">مفيش طلبات سلف</p>}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {tab === "leaves" && (
+        <div className="px-4 space-y-3">
+          <Card>
+            <p className="text-sm font-medium mb-1">رصيد الإجازة السنوية</p>
+            <p className="text-xs text-gray-500 mb-3">مستخدم {usedAnnual} من {ANNUAL_LEAVE_ALLOWANCE} يوم لسنة {thisYear()}</p>
+            <div className="space-y-2">
+              <select value={leaveForm.type} onChange={(e) => setLeaveForm({ ...leaveForm, type: e.target.value })} className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">
+                {LEAVE_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </select>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="date" value={leaveForm.start} onChange={(e) => setLeaveForm({ ...leaveForm, start: e.target.value })} className="w-full border border-gray-300 rounded-xl px-2 py-2 text-xs" />
+                <input type="date" value={leaveForm.end} onChange={(e) => setLeaveForm({ ...leaveForm, end: e.target.value })} className="w-full border border-gray-300 rounded-xl px-2 py-2 text-xs" />
+              </div>
+              <input placeholder="سبب الإجازة (اختياري)" value={leaveForm.reason} onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })} className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" />
+              {leaveError && <p className="text-red-600 text-xs">{leaveError}</p>}
+              <Button onClick={submitLeave} className="w-full text-sm"><CalendarDays size={16} /> إرسال طلب إجازة</Button>
+            </div>
+          </Card>
+          <Card>
+            <p className="text-sm font-medium mb-2">طلباتي</p>
+            <div className="space-y-2">
+              {leaves.map((l) => (
+                <div key={l.id} className="flex items-center justify-between border-b border-gray-50 pb-2 text-xs">
+                  <div><p className="font-medium">{LEAVE_TYPES.find((t) => t.id === l.type)?.label} · {l.days} يوم</p><p className="text-gray-500">{l.startDate} → {l.endDate}</p></div>
+                  <Badge tone={l.status === "approved" ? "green" : l.status === "rejected" ? "red" : "amber"}>{l.status === "approved" ? "موافق عليها" : l.status === "rejected" ? "مرفوضة" : "قيد المراجعة"}</Badge>
+                </div>
+              ))}
+              {leaves.length === 0 && <p className="text-xs text-gray-400">مفيش طلبات إجازة</p>}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {tab === "salary" && (
+        <div className="px-4 space-y-3">
+          <Card><p className="text-xs text-gray-500 mb-1">الراتب الأساسي</p><p className="text-xl font-semibold">{fmtMoney(user.baseSalary)} جنيه</p></Card>
+          {activeAdvance && <Card><p className="text-xs text-gray-500 mb-1">خصم قسط السلفة الشهري</p><p className="text-lg font-semibold text-red-600">- {fmtMoney(activeAdvance.installmentAmount)} جنيه</p></Card>}
+          <Card className="bg-teal-50 border-teal-200">
+            <p className="text-xs text-teal-700 mb-1">صافي الراتب المستحق</p>
+            <p className="text-xl font-semibold text-teal-800">{fmtMoney(netSalary())} جنيه</p>
+            <p className="text-xs text-teal-700 mt-2">طريقة الصرف: {user.paymentMethod === "cash" ? "كاش" : "تحويل بنكي / شبكة"}</p>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BranchForm({ branch, onSave }) {
+  const [form, setForm] = useState(branch);
+  const [locating, setLocating] = useState(false);
+  useEffect(() => setForm(branch), [branch]);
+  const useCurrentLocation = () => { setLocating(true); navigator.geolocation.getCurrentPosition((pos) => { setForm({ ...form, lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); }, () => setLocating(false)); };
+  return (
+    <div className="space-y-2">
+      <input placeholder="اسم الفرع" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" />
+      <div className="grid grid-cols-2 gap-2">
+        <input type="number" placeholder="خط العرض" value={form.lat} onChange={(e) => setForm({ ...form, lat: parseFloat(e.target.value) })} className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" />
+        <input type="number" placeholder="خط الطول" value={form.lng} onChange={(e) => setForm({ ...form, lng: parseFloat(e.target.value) })} className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" />
+      </div>
+      <Button variant="outline" onClick={useCurrentLocation} disabled={locating} className="w-full text-xs"><MapPin size={14} /> {locating ? "جاري التحديد..." : "استخدم موقعي الحالي"}</Button>
+      <input type="number" placeholder="نطاق السماح بالمتر" value={form.radiusMeters} onChange={(e) => setForm({ ...form, radiusMeters: parseFloat(e.target.value) })} className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" />
+      <Button onClick={() => onSave(form)} className="w-full text-sm">حفظ بيانات الفرع</Button>
+    </div>
+  );
+}
+
+function AdminDashboard({ employees, branches, company, attendance, advances, leaves, onLogout, onSaveBranch, onAddBranch, onDeleteBranch, onAddEmployee, onDeactivateEmployee, onDecideAdvance, onDecideLeave, onSaveCompany }) {
+  const [tab, setTab] = useState("employees");
+  const [newEmp, setNewEmp] = useState({ name: "", email: "", password: "", baseSalary: "", paymentMethod: "cash", branchId: branches[0]?.id || "" });
+  const [empError, setEmpError] = useState("");
+  const [empBusy, setEmpBusy] = useState(false);
+  const [newBranchName, setNewBranchName] = useState("");
+  const [editBranchId, setEditBranchId] = useState(branches[0]?.id || "");
+  const [reportMonth, setReportMonth] = useState(monthKey(todayStr()));
+  const [companyName, setCompanyName] = useState(company.companyName);
+
+  const pendingAdvances = advances.filter((a) => a.status === "pending");
+  const pendingLeaves = leaves.filter((l) => l.status === "pending");
+  const activeEmployees = employees.filter((e) => e.role !== "admin" && e.active !== false);
+
+  const addEmployee = async () => {
+    setEmpError("");
+    if (!newEmp.name || !newEmp.email || !newEmp.password || !newEmp.branchId) return setEmpError("املأ كل الحقول");
+    if (newEmp.password.length < 6) return setEmpError("كلمة المرور لازم 6 حروف على الأقل");
+    setEmpBusy(true);
+    try {
+      await onAddEmployee(newEmp);
+      setNewEmp({ name: "", email: "", password: "", baseSalary: "", paymentMethod: "cash", branchId: branches[0]?.id || "" });
+    } catch (e) { setEmpError(e.message || "حصل خطأ في إنشاء الحساب"); }
+    setEmpBusy(false);
+  };
+  const addBranch = () => { if (!newBranchName) return; const b = { id: uid(), name: newBranchName, lat: 30.0444, lng: 31.2357, radiusMeters: 300 }; onAddBranch(b); setNewBranchName(""); setEditBranchId(b.id); };
+
+  const monthlyReport = useMemo(() => activeEmployees.map((e) => {
+    const records = attendance.filter((a) => a.employeeId === e.id && monthKey(a.date) === reportMonth);
+    const presentDays = records.filter((r) => r.checkInTime).length;
+    const leaveDays = leaves.filter((l) => l.employeeId === e.id && l.status === "approved" && monthKey(l.startDate) === reportMonth).reduce((s, l) => s + l.days, 0);
+    const activeAdvance = advances.find((a) => a.employeeId === e.id && a.status === "approved" && a.remainingInstallments > 0);
+    const deduction = activeAdvance ? activeAdvance.installmentAmount : 0;
+    return { emp: e, presentDays, leaveDays, deduction, net: e.baseSalary - deduction };
+  }), [activeEmployees, attendance, leaves, advances, reportMonth]);
+
+  const editingBranch = branches.find((b) => b.id === editBranchId) || branches[0];
+
+  return (
+    <div className="max-w-xs mx-auto pb-6">
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <div className="flex items-center gap-2"><Logo size={36} /><div><p className="font-semibold text-sm">لوحة المشرف</p><p className="text-xs text-gray-500">{company.companyName}</p></div></div>
+        <button onClick={onLogout} className="text-gray-400 p-2"><LogOut size={18} /></button>
+      </div>
+      <div className="flex gap-1 px-4 mb-3 flex-wrap">
+        {[["employees", "الموظفين", Users], ["branches", "الفروع", Building2], ["attendance", "الحضور", Clock], ["advances", "السلف", Wallet], ["leaves", "الإجازات", CalendarDays], ["reports", "التقارير", FileBarChart], ["settings", "الإعدادات", Settings]].map(([k, label, Icon]) => (
+          <button key={k} onClick={() => setTab(k)} className={`text-xs py-2 px-2.5 rounded-lg font-medium flex items-center gap-1 ${tab === k ? "bg-teal-600 text-white" : "bg-gray-100 text-gray-600"}`}><Icon size={13} /> {label}</button>
+        ))}
+      </div>
+
+      {tab === "employees" && (
+        <div className="px-4 space-y-3">
+          <Card>
+            <p className="text-sm font-medium mb-3">إضافة موظف (هيتعمله حساب دخول تلقائي)</p>
+            <div className="space-y-2">
+              <input placeholder="الاسم" value={newEmp.name} onChange={(e) => setNewEmp({ ...newEmp, name: e.target.value })} className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" />
+              <input type="email" dir="ltr" placeholder="email@company.com" value={newEmp.email} onChange={(e) => setNewEmp({ ...newEmp, email: e.target.value })} className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" />
+              <input type="text" dir="ltr" placeholder="كلمة مرور مبدئية (٦ حروف+)" value={newEmp.password} onChange={(e) => setNewEmp({ ...newEmp, password: e.target.value })} className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" />
+              <input type="number" placeholder="الراتب الأساسي" value={newEmp.baseSalary} onChange={(e) => setNewEmp({ ...newEmp, baseSalary: e.target.value })} className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm" />
+              <select value={newEmp.branchId} onChange={(e) => setNewEmp({ ...newEmp, branchId: e.target.value })} className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">
+                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+              <select value={newEmp.paymentMethod} onChange={(e) => setNewEmp({ ...newEmp, paymentMethod: e.target.value })} className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm">
+                <option value="cash">كاش</option><option value="bank">تحويل بنكي / شبكة</option>
+              </select>
+              {empError && <p className="text-red-600 text-xs">{empError}</p>}
+              <Button onClick={addEmployee} disabled={empBusy} className="w-full text-sm"><Plus size={16} /> {empBusy ? "جاري الإضافة..." : "إضافة"}</Button>
+            </div>
+          </Card>
+          <Card>
+            <p className="text-sm font-medium mb-2">قائمة الموظفين</p>
+            <div className="space-y-2">
+              {activeEmployees.map((e) => (
+                <div key={e.id} className="flex items-center justify-between border-b border-gray-50 pb-2">
+                  <div><p className="text-sm">{e.name}</p><p className="text-xs text-gray-500">{fmtMoney(e.baseSalary)} جنيه · {branches.find((b) => b.id === e.branchId)?.name}</p></div>
+                  <button onClick={() => onDeactivateEmployee(e.id)} className="text-red-400 p-1" title="تعطيل الحساب"><Trash2 size={15} /></button>
+                </div>
+              ))}
+              {activeEmployees.length === 0 && <p className="text-xs text-gray-400">مفيش موظفين لسه</p>}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {tab === "branches" && (
+        <div className="px-4 space-y-3">
+          <Card>
+            <p className="text-sm font-medium mb-2">إضافة فرع / موقع عمل جديد</p>
+            <div className="flex gap-2"><input placeholder="اسم الفرع" value={newBranchName} onChange={(e) => setNewBranchName(e.target.value)} className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm" /><Button onClick={addBranch}><Plus size={16} /></Button></div>
+          </Card>
+          <Card>
+            <p className="text-sm font-medium mb-2">الفروع</p>
+            <div className="space-y-1">
+              {branches.map((b) => (
+                <button key={b.id} onClick={() => setEditBranchId(b.id)} className={`w-full text-right text-sm px-3 py-2 rounded-lg flex justify-between items-center ${editBranchId === b.id ? "bg-teal-50 text-teal-800" : "bg-gray-50"}`}>
+                  {b.name}{branches.length > 1 && <Trash2 size={14} onClick={(ev) => { ev.stopPropagation(); onDeleteBranch(b.id); }} className="text-red-400" />}
+                </button>
+              ))}
+            </div>
+          </Card>
+          {editingBranch && <Card><p className="text-sm font-medium mb-2">تعديل موقع {editingBranch.name}</p><BranchForm branch={editingBranch} onSave={onSaveBranch} /></Card>}
+        </div>
+      )}
+
+      {tab === "attendance" && (
+        <div className="px-4 space-y-2">
+          {attendance.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 30).map((r) => {
+            const emp = employees.find((e) => e.id === r.employeeId);
+            return (<Card key={r.id} className="flex items-center gap-3">{r.checkInSelfie && <img src={r.checkInSelfie} alt="" className="w-10 h-10 rounded-full object-cover" />}<div className="flex-1"><p className="text-sm font-medium">{emp?.name || "—"}</p><p className="text-xs text-gray-500">{r.date} · دخول {r.checkInTime || "—"} · انصراف {r.checkOutTime || "—"}</p></div></Card>);
+          })}
+          {attendance.length === 0 && <p className="text-xs text-gray-400 text-center py-6">مفيش سجلات حضور لسه</p>}
+        </div>
+      )}
+
+      {tab === "advances" && (
+        <div className="px-4 space-y-3">
+          <Card>
+            <p className="text-sm font-medium mb-2">طلبات معلّقة ({pendingAdvances.length})</p>
+            <div className="space-y-2">
+              {pendingAdvances.map((a) => {
+                const emp = employees.find((e) => e.id === a.employeeId);
+                return (
+                  <div key={a.id} className="border border-gray-100 rounded-xl p-2.5">
+                    <p className="text-sm font-medium">{emp?.name}</p>
+                    <p className="text-xs text-gray-500 mb-2">{fmtMoney(a.amount)} جنيه على {a.installmentsCount} أقساط</p>
+                    <div className="flex gap-2">
+                      <Button onClick={() => onDecideAdvance(a, "approved")} className="flex-1 text-xs py-1.5"><CheckCircle2 size={14} /> موافقة</Button>
+                      <Button variant="danger" onClick={() => onDecideAdvance(a, "rejected")} className="flex-1 text-xs py-1.5"><XCircle size={14} /> رفض</Button>
+                    </div>
+                  </div>
+                );
+              })}
+              {pendingAdvances.length === 0 && <p className="text-xs text-gray-400">مفيش طلبات معلقة</p>}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {tab === "leaves" && (
+        <div className="px-4 space-y-3">
+          <Card>
+            <p className="text-sm font-medium mb-2">طلبات إجازة معلّقة ({pendingLeaves.length})</p>
+            <div className="space-y-2">
+              {pendingLeaves.map((l) => {
+                const emp = employees.find((e) => e.id === l.employeeId);
+                return (
+                  <div key={l.id} className="border border-gray-100 rounded-xl p-2.5">
+                    <p className="text-sm font-medium">{emp?.name}</p>
+                    <p className="text-xs text-gray-500 mb-2">{LEAVE_TYPES.find((t) => t.id === l.type)?.label} · {l.startDate} → {l.endDate} ({l.days} يوم)</p>
+                    <div className="flex gap-2">
+                      <Button onClick={() => onDecideLeave(l, "approved")} className="flex-1 text-xs py-1.5"><CheckCircle2 size={14} /> موافقة</Button>
+                      <Button variant="danger" onClick={() => onDecideLeave(l, "rejected")} className="flex-1 text-xs py-1.5"><XCircle size={14} /> رفض</Button>
+                    </div>
+                  </div>
+                );
+              })}
+              {pendingLeaves.length === 0 && <p className="text-xs text-gray-400">مفيش طلبات معلقة</p>}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {tab === "reports" && (
+        <div className="px-4 space-y-3">
+          <Card>
+            <input type="month" value={reportMonth} onChange={(e) => setReportMonth(e.target.value)} className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm mb-3" />
+            <div className="space-y-2">
+              {monthlyReport.map((r) => (
+                <div key={r.emp.id} className="border-b border-gray-50 pb-2">
+                  <p className="text-sm font-medium">{r.emp.name}</p>
+                  <p className="text-xs text-gray-500">أيام حضور: {r.presentDays} · إجازات: {r.leaveDays} يوم</p>
+                  <p className="text-xs text-teal-700">صافي الراتب: {fmtMoney(r.net)} جنيه</p>
+                </div>
+              ))}
+              {monthlyReport.length === 0 && <p className="text-xs text-gray-400">مفيش بيانات للشهر ده</p>}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {tab === "settings" && (
+        <div className="px-4 space-y-3">
+          <Card>
+            <p className="text-sm font-medium mb-2">اسم الشركة</p>
+            <div className="flex gap-2"><input value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm" /><Button onClick={() => onSaveCompany({ companyName })}>حفظ</Button></div>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [session, setSession] = useState(null); // {idToken, refreshToken, uid, expiresAt}
+  const [profile, setProfile] = useState(null);
+  const [loadingApp, setLoadingApp] = useState(false);
+  const [employees, setEmployees] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [company, setCompany] = useState(DEFAULT_COMPANY);
+  const [attendance, setAttendance] = useState([]);
+  const [advances, setAdvances] = useState([]);
+  const [leaves, setLeaves] = useState([]);
+
+  const handleLogin = async (email, password) => {
+    const authData = await authSignIn(email, password);
+    const prof = await fbGet(`employees/${authData.localId}`, authData.idToken);
+    if (!prof) throw new Error("حسابك مش مسجل كموظف في النظام. كلم المشرف يضيفك.");
+    setSession({ idToken: authData.idToken, refreshToken: authData.refreshToken, uid: authData.localId, expiresAt: Date.now() + parseInt(authData.expiresIn, 10) * 1000 });
+    setProfile(prof);
+  };
+  const handleLogout = () => { setSession(null); setProfile(null); setEmployees([]); setBranches([]); setAttendance([]); setAdvances([]); setLeaves([]); };
+
+  useEffect(() => {
+    if (!session) return;
+    const interval = setInterval(async () => {
+      try { const r = await authRefresh(session.refreshToken); setSession((s) => (s ? { ...s, idToken: r.idToken, refreshToken: r.refreshToken, expiresAt: Date.now() + parseInt(r.expiresIn, 10) * 1000 } : s)); }
+      catch (e) { console.error(e); }
+    }, 50 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [session]);
+
+  useEffect(() => {
+    if (!session || !profile) return;
+    (async () => {
+      setLoadingApp(true);
+      if (profile.role === "admin") {
+        const [emp, br, comp, att, adv, lv] = await Promise.all([
+          fbGet("employees", session.idToken), fbGet("branches", session.idToken), fbGet("company", session.idToken),
+          fbGet("attendance", session.idToken), fbGet("advances", session.idToken), fbGet("leaves", session.idToken),
+        ]);
+        setEmployees(objToArray(emp));
+        let brArr = objToArray(br);
+        if (brArr.length === 0) { await fbPut(`branches/${DEFAULT_BRANCH.id}`, DEFAULT_BRANCH, session.idToken); brArr = [DEFAULT_BRANCH]; }
+        setBranches(brArr);
+        if (!comp) { await fbPut("company", DEFAULT_COMPANY, session.idToken); setCompany(DEFAULT_COMPANY); } else setCompany(comp);
+        setAttendance(flattenByUid(att)); setAdvances(flattenByUid(adv)); setLeaves(flattenByUid(lv));
+      } else {
+        const [br, comp, att, adv, lv] = await Promise.all([
+          fbGet("branches", session.idToken), fbGet("company", session.idToken),
+          fbGet(`attendance/${session.uid}`, session.idToken), fbGet(`advances/${session.uid}`, session.idToken), fbGet(`leaves/${session.uid}`, session.idToken),
+        ]);
+        setBranches(objToArray(br)); setCompany(comp || DEFAULT_COMPANY);
+        setAttendance(objToArray(att).map((r) => ({ ...r, employeeId: session.uid })));
+        setAdvances(objToArray(adv).map((r) => ({ ...r, employeeId: session.uid })));
+        setLeaves(objToArray(lv).map((r) => ({ ...r, employeeId: session.uid })));
+      }
+      setLoadingApp(false);
+    })();
+  }, [session, profile]);
+
+  const handleAddAttendance = useCallback(async ({ type, selfie, distance }) => {
+    const date = todayStr();
+    if (type === "in") {
+      const record = { id: date, employeeId: session.uid, date, checkInTime: nowStr(), checkInSelfie: selfie, checkInDistance: distance };
+      setAttendance((prev) => [...prev.filter((a) => a.date !== date), record]);
+      await fbPut(`attendance/${session.uid}/${date}`, record, session.idToken);
+    } else {
+      const updates = { checkOutTime: nowStr(), checkOutSelfie: selfie, checkOutDistance: distance };
+      setAttendance((prev) => prev.map((a) => (a.date === date ? { ...a, ...updates } : a)));
+      await fbPatch(`attendance/${session.uid}/${date}`, updates, session.idToken);
+    }
+  }, [session]);
+
+  const handleRequestAdvance = useCallback(async ({ amount, installments }) => {
+    const id = uid();
+    const record = { id, employeeId: session.uid, amount, installmentsCount: installments, installmentAmount: Math.round((amount / installments) * 100) / 100, remainingInstallments: installments, status: "pending", requestDate: todayStr() };
+    setAdvances((prev) => [...prev, record]);
+    await fbPut(`advances/${session.uid}/${id}`, record, session.idToken);
+  }, [session]);
+
+  const handleRequestLeave = useCallback(async ({ type, start, end, reason, days }) => {
+    const id = uid();
+    const record = { id, employeeId: session.uid, type, startDate: start, endDate: end, reason, days, status: "pending" };
+    setLeaves((prev) => [...prev, record]);
+    await fbPut(`leaves/${session.uid}/${id}`, record, session.idToken);
+  }, [session]);
+
+  const handleDecideAdvance = useCallback(async (record, status) => {
+    setAdvances((prev) => prev.map((a) => (a.id === record.id && a.employeeId === record.employeeId ? { ...a, status } : a)));
+    await fbPatch(`advances/${record.employeeId}/${record.id}`, { status }, session.idToken);
+  }, [session]);
+  const handleDecideLeave = useCallback(async (record, status) => {
+    setLeaves((prev) => prev.map((l) => (l.id === record.id && l.employeeId === record.employeeId ? { ...l, status } : l)));
+    await fbPatch(`leaves/${record.employeeId}/${record.id}`, { status }, session.idToken);
+  }, [session]);
+  const handleSaveBranch = useCallback(async (b) => { setBranches((prev) => prev.map((x) => (x.id === b.id ? b : x))); await fbPut(`branches/${b.id}`, b, session.idToken); }, [session]);
+  const handleAddBranch = useCallback(async (b) => { setBranches((prev) => [...prev, b]); await fbPut(`branches/${b.id}`, b, session.idToken); }, [session]);
+  const handleDeleteBranch = useCallback(async (id) => { setBranches((prev) => prev.filter((b) => b.id !== id)); await fbDelete(`branches/${id}`, session.idToken); }, [session]);
+
+  const handleAddEmployee = useCallback(async ({ name, email, password, baseSalary, paymentMethod, branchId }) => {
+    const authData = await authSignUp(email, password);
+    const empUid = authData.localId;
+    const profileRec = { id: empUid, name, role: "employee", baseSalary: parseFloat(baseSalary) || 0, paymentMethod, branchId, active: true, email };
+    await fbPut(`employees/${empUid}`, profileRec, session.idToken);
+    setEmployees((prev) => [...prev, profileRec]);
+  }, [session]);
+  const handleDeactivateEmployee = useCallback(async (empId) => {
+    setEmployees((prev) => prev.map((e) => (e.id === empId ? { ...e, active: false } : e)));
+    await fbPatch(`employees/${empId}`, { active: false }, session.idToken);
+  }, [session]);
+  const handleSaveCompany = useCallback(async (c) => { setCompany(c); await fbPut("company", c, session.idToken); }, [session]);
+
+  if (session && (loadingApp || !profile)) return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-teal-600" size={28} /></div>;
+
+  const userBranch = profile ? branches.find((b) => b.id === profile.branchId) || branches[0] : null;
+  const currentUser = profile ? { ...profile, id: session.uid } : null;
+
+  return (
+    <div dir="rtl" className="min-h-screen bg-gray-50" style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif" }}>
+      {!session && <Login company={DEFAULT_COMPANY} onLogin={handleLogin} />}
+      {session && profile && profile.role === "admin" && (
+        <AdminDashboard employees={employees} branches={branches} company={company} attendance={attendance} advances={advances} leaves={leaves}
+          onLogout={handleLogout} onSaveBranch={handleSaveBranch} onAddBranch={handleAddBranch} onDeleteBranch={handleDeleteBranch}
+          onAddEmployee={handleAddEmployee} onDeactivateEmployee={handleDeactivateEmployee} onDecideAdvance={handleDecideAdvance} onDecideLeave={handleDecideLeave} onSaveCompany={handleSaveCompany} />
+      )}
+      {session && profile && profile.role === "employee" && (
+        <EmployeeDashboard user={currentUser} branch={userBranch} attendance={attendance} advances={advances} leaves={leaves}
+          onAddAttendance={handleAddAttendance} onRequestAdvance={handleRequestAdvance} onRequestLeave={handleRequestLeave} onLogout={handleLogout} />
+      )}
+    </div>
+  );
+}
+
+try {
+  document.getElementById("loading").remove();
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+} catch (err) {
+  var d = document.getElementById("diag");
+  d.style.display = "block";
+  d.textContent = "RENDER ERROR:\n" + err.message + (err.stack ? "\n\n" + err.stack : "");
+}
+</script>
+</body>
+</html>
