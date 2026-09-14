@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Tal Al Baraka — 3D Attendance & Payroll</title>
+<title>Tal Al Baraka — نظام الحضور والرواتب</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -74,9 +74,9 @@ function Header({ profile, onLogout }) { return React.createElement("header", { 
     React.createElement("div", { className: "flex items-center gap-3" },
         React.createElement("div", { className: "hidden sm:block text-right" },
             React.createElement("div", { className: "text-sm font-semibold" }, profile?.name),
-            React.createElement("div", { className: "text-xs muted" }, profile?.role === "admin" ? "Supervisor" : "Employee")),
-        React.createElement("button", { onClick: onLogout, className: "pill rounded-xl px-3 py-2 text-xs" }, "Sign out"))); }
-function Selfie({ onDone, onCancel, label }) { const ref = useRef(), stream = useRef(); const [ready, setReady] = useState(false), [err, setErr] = useState(""); useEffect(() => { let live = true; navigator.mediaDevices?.getUserMedia({ video: { facingMode: "user" }, audio: false }).then(s => { if (!live)
+            React.createElement("div", { className: "text-xs muted" }, profile?.role === "admin" ? "المشرف" : "الموظف")),
+        React.createElement("button", { onClick: onLogout, className: "pill rounded-xl px-3 py-2 text-xs" }, "تسجيل الخروج"))); }
+function Selfie({ onDone, onCancel, label }) { const ref = useRef(), stream = useRef(); const [ready, setReady] = useState(false), [err, setErr] = useState(""); useEffect(() => { let live = true; navigator.mediaDevices?.getUserMedia({ video: { facingMode: { ideal: "user" }, width: { ideal: 720 }, height: { ideal: 720 } }, audio: false }).then(s => { if (!live)
     return; s = Object.assign(s); stream.current = s; if (ref.current) {
     ref.current.srcObject = s;
     ref.current.play();
@@ -86,10 +86,10 @@ function Selfie({ onDone, onCancel, label }) { const ref = useRef(), stream = us
         React.createElement("div", { className: "font-semibold mb-3" }, label),
         err ? React.createElement("div", { className: "text-red-300 text-sm py-12 text-center" }, err) : React.createElement("video", { ref: ref, muted: true, playsInline: true, className: "w-full aspect-square object-cover rounded-2xl bg-black", style: { transform: "scaleX(-1)" } }),
         React.createElement("div", { className: "flex gap-2 mt-4" },
-            React.createElement(Btn, { kind: "secondary", onClick: onCancel }, "Cancel"),
-            React.createElement(Btn, { disabled: !ready, onClick: snap }, "Capture Selfie")))); }
+            React.createElement(Btn, { kind: "secondary", onClick: onCancel }, "إلغاء"),
+            React.createElement(Btn, { disabled: !ready, onClick: snap }, "التقاط سيلفي")))); }
 function Login({ onLogin }) { const [e, setE] = useState(""), [p, setP] = useState(""), [busy, setBusy] = useState(false), [err, setErr] = useState(""); const go = async () => { if (!e || !p)
-    return setErr("Enter email and password."); setBusy(true); setErr(""); try {
+    return setErr("أدخل البريد الإلكتروني وكلمة المرور."); setBusy(true); setErr(""); try {
     await onLogin(e, p);
 }
 catch (x) {
@@ -99,14 +99,14 @@ catch (x) {
         React.createElement("div", { className: "flex flex-col items-center mb-6" },
             React.createElement(Logo, null),
             React.createElement("h1", { className: "text-2xl font-black mt-3" }, "TAL AL BARAKA"),
-            React.createElement("p", { className: "muted text-sm" }, "Attendance & Payroll Control Center")),
+            React.createElement("p", { className: "muted text-sm" }, "مركز التحكم في الحضور والرواتب")),
         React.createElement("div", { className: "space-y-3" },
             React.createElement("input", { className: "field", dir: "ltr", placeholder: "Email", value: e, onChange: x => setE(x.target.value) }),
-            React.createElement("input", { className: "field", dir: "ltr", type: "password", placeholder: "Password", value: p, onChange: x => setP(x.target.value) }),
+            React.createElement("input", { className: "field", dir: "ltr", type: "password", placeholder: "كلمة المرور", value: p, onChange: x => setP(x.target.value) }),
             err && React.createElement("div", { className: "text-red-300 text-sm" }, err),
-            React.createElement(Btn, { disabled: busy, onClick: go }, busy ? "Signing in…" : "Sign in")))); }
-function Employee({ user, branch, attendance, advances, leaves, onAttendance, onAdvance, onLeave, onLogout }) { const [t, setT] = useState("home"), [camera, setCamera] = useState(null), [loc, setLoc] = useState(null), [adv, setAdv] = useState(""), [inst, setInst] = useState("3"), [leave, setLeave] = useState({ type: "annual", start: today(), end: today(), reason: "" }); const rec = attendance.find(a => a.date === today()); const start = () => { setLoc({ status: "checking" }); navigator.geolocation?.getCurrentPosition(pos => { const d = haversine(pos.coords.latitude, pos.coords.longitude, branch.lat, branch.lng); setLoc({ ok: d <= branch.radiusMeters, d: Math.round(d), lat: pos.coords.latitude, lng: pos.coords.longitude }); }, () => setLoc({ ok: false, msg: "Location permission is required." }), { enableHighAccuracy: true, timeout: 10000 }); }; const action = type => { start(); setCamera(type); }; const haversine = (a, b, c, d) => { const R = 6371000, r = Math.PI / 180, A = Math.sin((c - a) * r / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin((d - b) * r / 2) ** 2; return R * 2 * Math.atan2(Math.sqrt(A), Math.sqrt(1 - A)); }; useEffect(() => { if (loc?.ok && camera && loc.status !== "checking") { } }, [loc, camera]); const capture = data => { const type = camera; setCamera(null); onAttendance({ type, selfie: data, distance: loc.d, lat: loc.lat, lng: loc.lng }); setLoc(null); }; const pay = (user.baseSalary || 0); return React.createElement("div", { className: "max-w-6xl mx-auto p-4 sm:p-6" },
-    camera && React.createElement(Selfie, { label: camera === "in" ? "Check-in selfie" : "Check-out selfie", onCancel: () => { setCamera(null); setLoc(null); }, onDone: capture }),
+            React.createElement(Btn, { disabled: busy, onClick: go }, busy ? "جارٍ تسجيل الدخول…" : "تسجيل الدخول")))); }
+function Employee({ user, branch, attendance, advances, leaves, onAttendance, onAdvance, onLeave, onLogout }) { const [t, setT] = useState("home"), [camera, setCamera] = useState(null), [pendingCamera, setPendingCamera] = useState(null), [loc, setLoc] = useState(null), [adv, setAdv] = useState(""), [inst, setInst] = useState("3"), [leave, setLeave] = useState({ type: "annual", start: today(), end: today(), reason: "" }); const rec = attendance.find(a => a.date === today()); const start = type => { setPendingCamera(type); setLoc({ status: "checking" }); if (!navigator.geolocation) return setLoc({ ok: false, msg: "الجهاز لا يدعم تحديد الموقع." }); navigator.geolocation.getCurrentPosition(pos => { const d = haversine(pos.coords.latitude, pos.coords.longitude, Number(branch.lat), Number(branch.lng)); const allowed = Math.min(300, Number(branch.radiusMeters) || 300); const ok = d <= allowed; setLoc({ ok, d: Math.round(d), lat: pos.coords.latitude, lng: pos.coords.longitude, allowed }); if (ok) setCamera(type); else setPendingCamera(null); }, () => { setPendingCamera(null); setLoc({ ok: false, msg: "يلزم السماح بالوصول إلى الموقع." }); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }); }; const haversine = (a, b, c, d) => { const R = 6371000, r = Math.PI / 180, A = Math.sin((c - a) * r / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin((d - b) * r / 2) ** 2; return R * 2 * Math.atan2(Math.sqrt(A), Math.sqrt(1 - A)); }; const capture = data => { const type = camera; if (!loc?.ok || !type) return; setCamera(null); onAttendance({ type, selfie: data, distance: loc.d, lat: loc.lat, lng: loc.lng }); setLoc(null); setPendingCamera(null); }; const pay = (user.baseSalary || 0); return React.createElement("div", { className: "max-w-6xl mx-auto p-4 sm:p-6" },
+    camera && React.createElement(Selfie, { label: camera === "in" ? "صورة سيلفي للتحضير" : "صورة سيلفي للانصراف", onCancel: () => { setCamera(null); setLoc(null); }, onDone: capture }),
     React.createElement(Header, { profile: user, onLogout: onLogout }),
     React.createElement("div", { className: "grid lg:grid-cols-3 gap-4 mb-4" },
         React.createElement(Card, { className: "lg:col-span-2" },
@@ -124,34 +124,34 @@ function Employee({ user, branch, attendance, advances, leaves, onAttendance, on
                     React.createElement("div", { className: "text-sm muted mt-2" },
                         branch?.name,
                         " \u2022 8 actual work hours \u2022 15 min grace")),
-                React.createElement(Badge, { tone: rec?.checkOutTime ? "green" : rec?.checkInTime ? "amber" : "blue" }, rec?.checkOutTime ? "Completed" : rec?.checkInTime ? "Working" : "Not checked in")),
-            loc?.status === "checking" && React.createElement("div", { className: "mt-4 text-sm muted" }, "Checking GPS location\u2026"),
-            loc && !loc.status && !loc.ok && React.createElement("div", { className: "mt-4 text-red-300 text-sm" }, loc.msg || `Outside allowed radius (${loc.d}m).`),
+                React.createElement(Badge, { tone: rec?.checkOutTime ? "green" : rec?.checkInTime ? "amber" : "blue" }, rec?.checkOutTime ? "مكتمل" : rec?.checkInTime ? "على رأس العمل" : "لم يتم التحضير")),
+            loc?.status === "checking" && React.createElement("div", { className: "mt-4 text-sm muted" }, "جارٍ التحقق من موقع GPS\u2026"),
+            loc && !loc.status && !loc.ok && React.createElement("div", { className: "mt-4 text-red-300 text-sm" }, loc.msg || `خارج النطاق المسموح (${loc.d}m).`),
             loc?.ok && React.createElement("div", { className: "mt-4 flex items-center justify-between" },
                 React.createElement("div", { className: "text-emerald-300 text-sm" },
-                    "GPS verified \u2022 ",
+                    "تم التحقق من الموقع \u2022 ",
                     loc.d,
-                    "m from branch"),
-                React.createElement(Btn, { onClick: () => setCamera(camera) }, "Capture selfie")),
+                    "م من موقع الفرع"),
+                React.createElement(Btn, { onClick: () => pendingCamera && setCamera(pendingCamera) }, "التقاط صورة سيلفي")),
             React.createElement("div", { className: "grid grid-cols-2 gap-3 mt-5" },
-                React.createElement(Btn, { disabled: !!rec?.checkInTime, onClick: () => action("in") }, "Check in"),
-                React.createElement(Btn, { kind: "secondary", disabled: !rec?.checkInTime || !!rec?.checkOutTime, onClick: () => action("out") }, "Check out"))),
+                React.createElement(Btn, { disabled: !!rec?.checkInTime, onClick: () => start("in") }, "تحضير"),
+                React.createElement(Btn, { kind: "secondary", disabled: !rec?.checkInTime || !!rec?.checkOutTime, onClick: () => start("out") }, "انصراف"))),
         React.createElement(Card, null,
-            React.createElement("div", { className: "text-xs muted" }, "MONTHLY PAY BASE"),
+            React.createElement("div", { className: "text-xs muted" }, "أساس الراتب الشهري"),
             React.createElement("div", { className: "text-3xl font-black mt-2" }, money(pay)),
-            React.createElement("div", { className: "text-sm muted mt-1" }, "26 paid-workday standard"),
+            React.createElement("div", { className: "text-sm muted mt-1" }, "المعيار: 26 يوم عمل مدفوع"),
             React.createElement("div", { className: "mt-4 grid grid-cols-2 gap-2" },
                 React.createElement("div", { className: "pill rounded-xl p-3" },
-                    React.createElement("div", { className: "text-xs muted" }, "Advances"),
+                    React.createElement("div", { className: "text-xs muted" }, "السلف"),
                     React.createElement("div", { className: "font-bold" }, money(advances.filter(a => a.status === "approved").reduce((s, a) => s + (a.installmentAmount || 0), 0)))),
                 React.createElement("div", { className: "pill rounded-xl p-3" },
-                    React.createElement("div", { className: "text-xs muted" }, "Work hours"),
+                    React.createElement("div", { className: "text-xs muted" }, "ساعات العمل"),
                     React.createElement("div", { className: "font-bold" }, "8/day"))))),
-    React.createElement("div", { className: "flex gap-2 mb-4 overflow-x-auto" }, [["home", "Dashboard"], ["advances", "Advances"], ["leaves", "Leaves"], ["salary", "Salary"]].map(x => React.createElement("button", { key: x[0], onClick: () => setT(x[0]), className: `px-4 py-2 rounded-xl text-sm ${t === x[0] ? "bg-teal-500" : "pill"}` }, x[1]))),
+    React.createElement("div", { className: "flex gap-2 mb-4 overflow-x-auto" }, [["home", "الرئيسية"], ["advances", "السلف"], ["leaves", "الإجازات"], ["salary", "الراتب"]].map(x => React.createElement("button", { key: x[0], onClick: () => setT(x[0]), className: `px-4 py-2 rounded-xl text-sm ${t === x[0] ? "bg-teal-500" : "pill"}` }, x[1]))),
     t === "advances" && React.createElement("div", { className: "grid md:grid-cols-2 gap-4" },
         React.createElement(Card, null,
             React.createElement("h3", { className: "font-bold mb-3" }, "Request Advance"),
-            React.createElement("input", { className: "field mb-2", type: "number", placeholder: "Amount", value: adv, onChange: e => setAdv(e.target.value) }),
+            React.createElement("input", { className: "field mb-2", type: "number", placeholder: "المبلغ", value: adv, onChange: e => setAdv(e.target.value) }),
             React.createElement("select", { className: "field mb-3", value: inst, onChange: e => setInst(e.target.value) }, [1, 2, 3, 4, 5, 6, 9, 12].map(n => React.createElement("option", { key: n }, n))),
             React.createElement(Btn, { onClick: () => { if (Number(adv) > 0) {
                     onAdvance({ amount: Number(adv), installments: Number(inst) });
@@ -168,11 +168,11 @@ function Employee({ user, branch, attendance, advances, leaves, onAttendance, on
                 React.createElement(Badge, { tone: a.status === "approved" ? "green" : a.status === "rejected" ? "red" : "amber" }, a.status))))),
     t === "leaves" && React.createElement("div", { className: "grid md:grid-cols-2 gap-4" },
         React.createElement(Card, null,
-            React.createElement("h3", { className: "font-bold mb-3" }, "Leave request"),
+            React.createElement("h3", { className: "font-bold mb-3" }, "طلب إجازة"),
             React.createElement("select", { className: "field mb-2", value: leave.type, onChange: e => setLeave({ ...leave, type: e.target.value }) },
-                React.createElement("option", { value: "annual" }, "Annual"),
-                React.createElement("option", { value: "sick" }, "Sick"),
-                React.createElement("option", { value: "casual" }, "Casual")),
+                React.createElement("option", { value: "annual" }, "سنوية"),
+                React.createElement("option", { value: "sick" }, "مرضية"),
+                React.createElement("option", { value: "casual" }, "عارضة")),
             React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-2" },
                 React.createElement("input", { className: "field", type: "date", value: leave.start, onChange: e => setLeave({ ...leave, start: e.target.value }) }),
                 React.createElement("input", { className: "field", type: "date", value: leave.end, onChange: e => setLeave({ ...leave, end: e.target.value }) })),
@@ -192,44 +192,43 @@ function Employee({ user, branch, attendance, advances, leaves, onAttendance, on
 function Salary({ user, attendance, advances }) { const present = attendance.filter(a => a.checkInTime).length; const extra = attendance.reduce((s, a) => s + (a.overtimeHours || 0), 0); const hourly = (Number(user.baseSalary) || 0) / (26 * 8); const advDed = advances.filter(a => a.status === "approved" && a.remainingInstallments > 0).reduce((s, a) => s + (a.installmentAmount || 0), 0); return React.createElement(Card, null,
     React.createElement("h3", { className: "font-bold mb-4" }, "Salary Statement"),
     React.createElement("div", { className: "grid sm:grid-cols-2 lg:grid-cols-4 gap-3" },
-        React.createElement(Stat, { l: "Base salary", v: money(user.baseSalary) }),
-        React.createElement(Stat, { l: "Present days", v: present }),
-        React.createElement(Stat, { l: "Overtime hours", v: extra.toFixed(2) }),
-        React.createElement(Stat, { l: "Advance deduction", v: money(advDed) })),
+        React.createElement(Stat, { l: "الراتب الأساسي", v: money(user.baseSalary) }),
+        React.createElement(Stat, { l: "أيام الحضور", v: present }),
+        React.createElement(Stat, { l: "ساعات إضافية", v: extra.toFixed(2) }),
+        React.createElement(Stat, { l: "خصم السلف", v: money(advDed) })),
     React.createElement("div", { className: "mt-5 p-4 rounded-2xl bg-teal-400/10 border border-teal-300/10" },
-        React.createElement("div", { className: "text-xs muted" }, "Estimated net"),
+        React.createElement("div", { className: "text-xs muted" }, "صافي الراتب التقديري"),
         React.createElement("div", { className: "text-3xl font-black" }, money(Math.max(0, (user.baseSalary || 0) - advDed + extra * hourly))),
         React.createElement("div", { className: "text-xs muted mt-1" }, "Hourly rate = Base salary \u00F7 26 \u00F7 8"))); }
 function Stat({ l, v }) { return React.createElement("div", { className: "pill rounded-xl p-3" },
     React.createElement("div", { className: "text-xs muted" }, l),
     React.createElement("div", { className: "text-xl font-bold mt-1" }, v)); }
-function BranchForm({ branch, onSave }) { const [f, setF] = useState(branch); useEffect(() => setF(branch), [branch.id]); return React.createElement(Card, null,
-    React.createElement("h3", { className: "font-bold mb-3" }, "Branch working schedule"),
+function BranchForm({ branch, onSave }) { const [f, setF] = useState(branch); useEffect(() => setF(branch), [branch.id]); const change = (k, v) => { let value = v; if (k === "radiusMeters") value = Math.min(300, Math.max(1, Number(v) || 300)); if (k === "requiredHours") value = 8; if (["lat","lng"].includes(k)) value = Number(v); setF({ ...f, [k]: value }); }; return React.createElement(Card, null,
+    React.createElement("h3", { className: "font-bold mb-3" }, "إعدادات موقع ودوام الفرع"),
     React.createElement("div", { className: "grid sm:grid-cols-2 gap-2" },
-        [["name", "Branch name", "text"], ["radiusMeters", "GPS radius (m)", "number"], ["shiftStart", "Shift start", "time"], ["shiftEnd", "Shift end", "time"], ["graceMinutes", "Grace minutes", "number"], ["requiredHours", "Actual work hours", "number"], ["monthlyWorkDays", "Monthly work days", "number"], ["weeklyOffDays", "Variable off days", "number"]].map(([k, p, t]) => React.createElement("input", { key: k, className: "field", type: t, placeholder: p, value: f[k] ?? "", onChange: e => setF({ ...f, [k]: t === "number" ? Number(e.target.value) : e.target.value }) })),
-        " "),
-    React.createElement("div", { className: "text-xs muted mt-3" }, "Actual work hours are locked at 8. Grace is 15 minutes. Off days can be distributed across the month."),
-    React.createElement(Btn, { onClick: () => onSave({ ...f, requiredHours: 8, graceMinutes: 15 }) }, "Save branch schedule")); }
-function Admin({ profile, employees, branches, attendance, advances, leaves, onLogout, onAddEmployee, onUpdateEmployee, onDeactivate, onSaveBranch, onAddBranch, onDeleteBranch, onDecision, onLeaveDecision }) { const [t, setT] = useState("employees"), [month, setMonth] = useState(monthKey(today())), [newE, setNewE] = useState({ name: "", email: "", password: "", baseSalary: "", paymentMethod: "cash", networkAmount: "", branchId: branches[0]?.id || "" }), [newB, setNewB] = useState(""), [edit, setEdit] = useState(null); const active = employees.filter(e => e.role !== "admin" && e.active !== false); const report = useMemo(() => active.map(e => { const rs = attendance.filter(a => a.employeeId === e.id && monthKey(a.date) === month); const adv = advances.filter(a => a.employeeId === e.id && a.status === "approved" && a.remainingInstallments > 0).reduce((s, a) => s + (a.installmentAmount || 0), 0); const ot = rs.reduce((s, a) => s + (a.overtimeHours || 0), 0); const hourly = (Number(e.baseSalary) || 0) / (26 * 8); const net = Math.max(0, (Number(e.baseSalary) || 0) - adv + ot * hourly); const network = e.paymentMethod === "bank" ? net : e.paymentMethod === "split" ? Math.min(Number(e.networkAmount) || 0, net) : 0; return { e, present: rs.filter(a => a.checkInTime).length, ot, adv, net, network, cash: net - network }; }), [active, attendance, advances, month]); const exportX = () => { const rows = report.map(r => ({ "Employee": r.e.name, "Present days": r.present, "Base salary": Number(r.e.baseSalary) || 0, "Overtime hours": r.ot, "Advance deduction": r.adv, "Net salary": r.net, "Cash": r.cash, "Network": r.network, "Payment method": r.e.paymentMethod })); const ws = XLSX.utils.json_to_sheet(rows), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Payroll"); XLSX.writeFile(wb, `Payroll-${month}.xlsx`); }; return React.createElement("div", { className: "max-w-7xl mx-auto p-4 sm:p-6" },
+        [["name", "اسم الفرع", "text"], ["lat", "خط العرض Latitude", "number"], ["lng", "خط الطول Longitude", "number"], ["radiusMeters", "نطاق التحضير (متر) — الحد الأقصى 300", "number"], ["shiftStart", "بداية الدوام", "time"], ["shiftEnd", "نهاية الدوام", "time"], ["graceMinutes", "دقائق السماح", "number"], ["requiredHours", "ساعات العمل الفعلية", "number"], ["monthlyWorkDays", "أيام العمل الشهرية", "number"], ["weeklyOffDays", "أيام الراحة المتغيرة", "number"]].map(([k, p, t]) => React.createElement("input", { key: k, className: "field", dir: "ltr", type: t, placeholder: p, value: f[k] ?? "", max: k === "radiusMeters" ? 300 : k === "requiredHours" ? 8 : undefined, onChange: e => change(k, e.target.value) }))),
+    React.createElement("div", { className: "text-xs muted mt-3" }, "التحضير والانصراف مسموحان فقط داخل نطاق الفرع وبحد أقصى 300 متر. الصورة يتم التقاطها مباشرة من كاميرا الجهاز ولا يوجد اختيار صورة من الاستوديو."),
+    React.createElement(Btn, { onClick: () => onSave({ ...f, radiusMeters: Math.min(300, Number(f.radiusMeters) || 300), requiredHours: 8, graceMinutes: 15 }) }, "حفظ إعدادات الفرع")); }
+function Admin({ profile, employees, branches, attendance, advances, leaves, onLogout, onAddEmployee, onUpdateEmployee, onDeactivate, onSaveBranch, onAddBranch, onDeleteBranch, onDecision, onLeaveDecision }) { const [t, setT] = useState("employees"), [month, setMonth] = useState(monthKey(today())), [newE, setNewE] = useState({ name: "", email: "", password: "", baseSalary: "", paymentMethod: "cash", networkAmount: "", branchId: branches[0]?.id || "" }), [newB, setNewB] = useState(""), [edit, setEdit] = useState(null); const active = employees.filter(e => e.role !== "admin" && e.active !== false); const report = useMemo(() => active.map(e => { const rs = attendance.filter(a => a.employeeId === e.id && monthKey(a.date) === month); const adv = advances.filter(a => a.employeeId === e.id && a.status === "approved" && a.remainingInstallments > 0).reduce((s, a) => s + (a.installmentAmount || 0), 0); const ot = rs.reduce((s, a) => s + (a.overtimeHours || 0), 0); const hourly = (Number(e.baseSalary) || 0) / (26 * 8); const net = Math.max(0, (Number(e.baseSalary) || 0) - adv + ot * hourly); const network = e.paymentMethod === "bank" ? net : e.paymentMethod === "split" ? Math.min(Number(e.networkAmount) || 0, net) : 0; return { e, present: rs.filter(a => a.checkInTime).length, ot, adv, net, network, cash: net - network }; }), [active, attendance, advances, month]); const exportX = () => { const rows = report.map(r => ({ "الموظف": r.e.name, "أيام الحضور": r.present, "الراتب الأساسي": Number(r.e.baseSalary) || 0, "ساعات إضافية": r.ot, "خصم السلف": r.adv, "صافي الراتب": r.net, "نقدي": r.cash, "شبكة": r.network, "طريقة الدفع": r.e.paymentMethod })); const ws = XLSX.utils.json_to_sheet(rows), wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Payroll"); XLSX.writeFile(wb, `Payroll-${month}.xlsx`); }; return React.createElement("div", { className: "max-w-7xl mx-auto p-4 sm:p-6" },
     React.createElement(Header, { profile: profile, onLogout: onLogout }),
-    React.createElement("div", { className: "grid lg:grid-cols-7 gap-2 mb-5" }, [["employees", "Employees"], ["branches", "Branches"], ["attendance", "Attendance"], ["advances", "Advances"], ["leaves", "Leaves"], ["reports", "Payroll Reports"], ["settings", "Settings"]].map(x => React.createElement("button", { key: x[0], onClick: () => setT(x[0]), className: `rounded-xl px-3 py-3 text-sm ${t === x[0] ? "bg-teal-500" : "glass"}` }, x[1]))),
+    React.createElement("div", { className: "grid lg:grid-cols-7 gap-2 mb-5" }, [["employees", "الموظفون"], ["branches", "الفروع"], ["attendance", "الحضور والانصراف"], ["advances", "السلف"], ["leaves", "الإجازات"], ["reports", "تقارير الرواتب"], ["settings", "الإعدادات"]].map(x => React.createElement("button", { key: x[0], onClick: () => setT(x[0]), className: `rounded-xl px-3 py-3 text-sm ${t === x[0] ? "bg-teal-500" : "glass"}` }, x[1]))),
     t === "employees" && React.createElement("div", { className: "grid lg:grid-cols-2 gap-4" },
         React.createElement(Card, null,
-            React.createElement("h3", { className: "font-bold mb-3" }, "Add employee"),
+            React.createElement("h3", { className: "font-bold mb-3" }, "إضافة موظف"),
             React.createElement("div", { className: "space-y-2" },
                 React.createElement("input", { className: "field", placeholder: "Full name", value: newE.name, onChange: e => setNewE({ ...newE, name: e.target.value }) }),
                 React.createElement("input", { className: "field", placeholder: "Email", value: newE.email, onChange: e => setNewE({ ...newE, email: e.target.value }) }),
-                React.createElement("input", { className: "field", type: "password", placeholder: "Password", value: newE.password, onChange: e => setNewE({ ...newE, password: e.target.value }) }),
-                React.createElement("input", { className: "field", type: "number", placeholder: "Base salary", value: newE.baseSalary, onChange: e => setNewE({ ...newE, baseSalary: e.target.value }) }),
+                React.createElement("input", { className: "field", type: "password", placeholder: "كلمة المرور", value: newE.password, onChange: e => setNewE({ ...newE, password: e.target.value }) }),
+                React.createElement("input", { className: "field", type: "number", placeholder: "الراتب الأساسي", value: newE.baseSalary, onChange: e => setNewE({ ...newE, baseSalary: e.target.value }) }),
                 React.createElement("select", { className: "field", value: newE.branchId, onChange: e => setNewE({ ...newE, branchId: e.target.value }) }, branches.map(b => React.createElement("option", { key: b.id, value: b.id }, b.name))),
                 React.createElement("select", { className: "field", value: newE.paymentMethod, onChange: e => setNewE({ ...newE, paymentMethod: e.target.value }) },
-                    React.createElement("option", { value: "cash" }, "Cash only"),
-                    React.createElement("option", { value: "bank" }, "Network / Bank only"),
-                    React.createElement("option", { value: "split" }, "Split: fixed Network + Cash balance")),
-                newE.paymentMethod === "split" && React.createElement("input", { className: "field", type: "number", placeholder: "Fixed Network amount", value: newE.networkAmount, onChange: e => setNewE({ ...newE, networkAmount: e.target.value }) }),
-                React.createElement(Btn, { onClick: () => { onAddEmployee({ ...newE, role: "employee" }); setNewE({ ...newE, name: "", email: "", password: "", baseSalary: "", networkAmount: "" }); } }, "Create employee"))),
+                    React.createElement("option", { value: "cash" }, "نقدي فقط"),
+                    React.createElement("option", { value: "bank" }, "شبكة / تحويل بنكي فقط"),
+                    React.createElement("option", { value: "split" }, "تقسيم: شبكة ثابتة + باقي نقدي")),
+                newE.paymentMethod === "split" && React.createElement("input", { className: "field", type: "number", placeholder: "مبلغ الشبكة الثابت", value: newE.networkAmount, onChange: e => setNewE({ ...newE, networkAmount: e.target.value }) }),
+                React.createElement(Btn, { onClick: () => { onAddEmployee({ ...newE, role: "employee" }); setNewE({ ...newE, name: "", email: "", password: "", baseSalary: "", networkAmount: "" }); } }, "إنشاء الموظف"))),
         React.createElement(Card, null,
-            React.createElement("h3", { className: "font-bold mb-3" }, "Employees"),
+            React.createElement("h3", { className: "font-bold mb-3" }, "الموظفون"),
             active.map(e => React.createElement("div", { key: e.id, className: "p-3 mb-2 rounded-xl pill flex justify-between gap-3" },
                 React.createElement("div", null,
                     React.createElement("div", { className: "font-semibold" }, e.name),
@@ -238,19 +237,19 @@ function Admin({ profile, employees, branches, attendance, advances, leaves, onL
                         " \u2022 ",
                         e.paymentMethod === "split" ? `Network ${money(e.networkAmount)}` : e.paymentMethod)),
                 React.createElement("div", { className: "flex gap-2" },
-                    React.createElement(Btn, { kind: "secondary", onClick: () => setEdit(e) }, "Edit"),
+                    React.createElement(Btn, { kind: "secondary", onClick: () => setEdit(e) }, "تعديل"),
                     React.createElement(Btn, { kind: "danger", onClick: () => onDeactivate(e.id) }, "Disable")))),
             edit && React.createElement(EditEmployee, { employee: edit, branches: branches, onSave: p => { onUpdateEmployee(edit.id, p); setEdit(null); }, onCancel: () => setEdit(null) }))),
     t === "branches" && React.createElement("div", { className: "grid lg:grid-cols-2 gap-4" },
         React.createElement(Card, null,
-            React.createElement("h3", { className: "font-bold mb-3" }, "Branches"),
+            React.createElement("h3", { className: "font-bold mb-3" }, "الفروع"),
             branches.map(b => React.createElement("div", { key: b.id, className: "flex justify-between items-center p-3 pill rounded-xl mb-2" },
                 React.createElement("span", null, b.name),
                 React.createElement("div", { className: "flex gap-2" },
                     React.createElement(Btn, { kind: "secondary", onClick: () => setEdit(b) }, "Schedule"),
-                    React.createElement(Btn, { kind: "danger", onClick: () => onDeleteBranch(b.id) }, "Delete")))),
+                    React.createElement(Btn, { kind: "danger", onClick: () => onDeleteBranch(b.id) }, "حذف")))),
             React.createElement("div", { className: "flex gap-2 mt-3" },
-                React.createElement("input", { className: "field", placeholder: "New branch name", value: newB, onChange: e => setNewB(e.target.value) }),
+                React.createElement("input", { className: "field", placeholder: "اسم الفرع الجديد", value: newB, onChange: e => setNewB(e.target.value) }),
                 React.createElement(Btn, { onClick: () => { if (newB) {
                         onAddBranch({ ...DEFAULT_BRANCH, id: uid(), name: newB });
                         setNewB("");
@@ -263,23 +262,23 @@ function Admin({ profile, employees, branches, attendance, advances, leaves, onL
     t === "reports" && React.createElement(Card, null,
         React.createElement("div", { className: "flex flex-wrap gap-2 items-center justify-between mb-4" },
             React.createElement("div", null,
-                React.createElement("h3", { className: "font-bold" }, "Payroll report"),
+                React.createElement("h3", { className: "font-bold" }, "تقرير الرواتب"),
                 React.createElement("p", { className: "text-xs muted" }, "26 work days \u2022 4 variable off days \u2022 8 actual hours/day \u2022 overtime paid hourly")),
             React.createElement("div", { className: "flex gap-2" },
                 React.createElement("input", { className: "field w-auto", type: "month", value: month, onChange: e => setMonth(e.target.value) }),
-                React.createElement(Btn, { onClick: exportX }, "Export Excel"))),
+                React.createElement(Btn, { onClick: exportX }, "تصدير Excel"))),
         React.createElement("div", { className: "overflow-auto" },
             React.createElement("table", null,
                 React.createElement("thead", null,
                     React.createElement("tr", null,
-                        React.createElement("th", null, "Employee"),
+                        React.createElement("th", null, "الموظف"),
                         React.createElement("th", null, "Present"),
                         React.createElement("th", null, "Base"),
                         React.createElement("th", null, "OT Hours"),
-                        React.createElement("th", null, "Advances"),
+                        React.createElement("th", null, "السلف"),
                         React.createElement("th", null, "Net"),
-                        React.createElement("th", null, "Cash"),
-                        React.createElement("th", null, "Network"))),
+                        React.createElement("th", null, "نقدي"),
+                        React.createElement("th", null, "شبكة"))),
                 React.createElement("tbody", null, report.map(r => React.createElement("tr", { key: r.e.id },
                     React.createElement("td", null, r.e.name),
                     React.createElement("td", null, r.present),
@@ -292,9 +291,9 @@ function Admin({ profile, employees, branches, attendance, advances, leaves, onL
     t === "settings" && React.createElement(Card, null,
         React.createElement("h3", { className: "font-bold mb-2" }, "System rules"),
         React.createElement("div", { className: "grid sm:grid-cols-2 lg:grid-cols-4 gap-3" },
-            React.createElement(Stat, { l: "Monthly work days", v: "26" }),
-            React.createElement(Stat, { l: "Variable off days", v: "4" }),
-            React.createElement(Stat, { l: "Actual work hours", v: "8" }),
+            React.createElement(Stat, { l: "أيام العمل الشهرية", v: "26" }),
+            React.createElement(Stat, { l: "أيام الراحة المتغيرة", v: "4" }),
+            React.createElement(Stat, { l: "ساعات العمل الفعلية", v: "8" }),
             React.createElement(Stat, { l: "Check-in grace", v: "15 min" })),
         React.createElement("p", { className: "text-sm muted mt-4" }, "Payroll uses an hourly rate of Base Salary \u00F7 26 \u00F7 8. Overtime is calculated from verified check-in/check-out records and paid at the employee hourly rate."))); }
 function EditEmployee({ employee, branches, onSave, onCancel }) { const [f, setF] = useState({ ...employee }); return React.createElement("div", { className: "mt-4 border-t border-white/10 pt-4 space-y-2" },
@@ -302,27 +301,27 @@ function EditEmployee({ employee, branches, onSave, onCancel }) { const [f, setF
     React.createElement("input", { className: "field", type: "number", value: f.baseSalary, onChange: e => setF({ ...f, baseSalary: Number(e.target.value) }) }),
     React.createElement("select", { className: "field", value: f.branchId, onChange: e => setF({ ...f, branchId: e.target.value }) }, branches.map(b => React.createElement("option", { key: b.id, value: b.id }, b.name))),
     React.createElement("select", { className: "field", value: f.paymentMethod, onChange: e => setF({ ...f, paymentMethod: e.target.value }) },
-        React.createElement("option", { value: "cash" }, "Cash only"),
-        React.createElement("option", { value: "bank" }, "Network / Bank only"),
-        React.createElement("option", { value: "split" }, "Split: fixed Network + Cash balance")),
-    f.paymentMethod === "split" && React.createElement("input", { className: "field", type: "number", placeholder: "Fixed Network amount", value: f.networkAmount || "", onChange: e => setF({ ...f, networkAmount: Number(e.target.value) }) }),
+        React.createElement("option", { value: "cash" }, "نقدي فقط"),
+        React.createElement("option", { value: "bank" }, "شبكة / تحويل بنكي فقط"),
+        React.createElement("option", { value: "split" }, "تقسيم: شبكة ثابتة + باقي نقدي")),
+    f.paymentMethod === "split" && React.createElement("input", { className: "field", type: "number", placeholder: "مبلغ الشبكة الثابت", value: f.networkAmount || "", onChange: e => setF({ ...f, networkAmount: Number(e.target.value) }) }),
     React.createElement("div", { className: "flex gap-2" },
-        React.createElement(Btn, { kind: "secondary", onClick: onCancel }, "Cancel"),
-        React.createElement(Btn, { onClick: () => onSave(f) }, "Save"))); }
+        React.createElement(Btn, { kind: "secondary", onClick: onCancel }, "إلغاء"),
+        React.createElement(Btn, { onClick: () => onSave(f) }, "حفظ"))); }
 function AttendanceTable({ attendance, employees, branches }) { return React.createElement(Card, null,
-    React.createElement("h3", { className: "font-bold mb-3" }, "Verified attendance"),
+    React.createElement("h3", { className: "font-bold mb-3" }, "سجل الحضور الموثق"),
     React.createElement("div", { className: "overflow-auto" },
         React.createElement("table", null,
             React.createElement("thead", null,
                 React.createElement("tr", null,
-                    React.createElement("th", null, "Date"),
-                    React.createElement("th", null, "Employee"),
-                    React.createElement("th", null, "Branch"),
-                    React.createElement("th", null, "Check in"),
-                    React.createElement("th", null, "Check out"),
+                    React.createElement("th", null, "التاريخ"),
+                    React.createElement("th", null, "الموظف"),
+                    React.createElement("th", null, "الفرع"),
+                    React.createElement("th", null, "تحضير"),
+                    React.createElement("th", null, "انصراف"),
                     React.createElement("th", null, "Hours"),
-                    React.createElement("th", null, "OT"),
-                    React.createElement("th", null, "GPS / Selfie"))),
+                    React.createElement("th", null, "إضافي"),
+                    React.createElement("th", null, "GPS / سيلفي"))),
             React.createElement("tbody", null, attendance.slice().sort((a, b) => b.date.localeCompare(a.date)).map(a => React.createElement("tr", { key: a.id },
                 React.createElement("td", null, a.date),
                 React.createElement("td", null, employees.find(e => e.id === a.employeeId)?.name || a.employeeId),
@@ -332,7 +331,7 @@ function AttendanceTable({ attendance, employees, branches }) { return React.cre
                 React.createElement("td", null, a.workHours?.toFixed?.(2) || "—"),
                 React.createElement("td", null, a.overtimeHours?.toFixed?.(2) || "0.00"),
                 React.createElement("td", null,
-                    React.createElement(Badge, { tone: "green" }, "Verified")))))))); }
+                    React.createElement(Badge, { tone: "green" }, "تم التحقق")))))))); }
 function Decisions({ title, items, employees, onDecision, kind }) { return React.createElement(Card, null,
     React.createElement("h3", { className: "font-bold mb-3" }, title),
     items.map(x => React.createElement("div", { key: x.id, className: "flex flex-wrap justify-between gap-3 p-3 pill rounded-xl mb-2" },
@@ -340,9 +339,9 @@ function Decisions({ title, items, employees, onDecision, kind }) { return React
             React.createElement("div", { className: "font-semibold" }, employees.find(e => e.id === x.employeeId)?.name || x.employeeId),
             React.createElement("div", { className: "text-sm muted" }, kind === "advance" ? `${money(x.amount)} • ${x.installmentsCount} installments` : `${x.startDate} → ${x.endDate} • ${x.days} days`)),
         React.createElement("div", { className: "flex gap-2" }, x.status === "pending" ? React.createElement(React.Fragment, null,
-            React.createElement(Btn, { onClick: () => onDecision(x, "approved") }, "Approve"),
-            React.createElement(Btn, { kind: "danger", onClick: () => onDecision(x, "rejected") }, "Reject")) : React.createElement(Badge, { tone: x.status === "approved" ? "green" : "red" }, x.status))))); }
-function App() { const [session, setSession] = useState(null), [profile, setProfile] = useState(null), [employees, setEmployees] = useState([]), [branches, setBranches] = useState([]), [attendance, setAttendance] = useState([]), [advances, setAdvances] = useState([]), [leaves, setLeaves] = useState([]), [loading, setLoading] = useState(true); const load = useCallback(async (s, p) => { const [es, bs, as, avs, ls] = await Promise.all([fbGet("employees", s), fbGet("branches", s), fbGet("attendance", s), fbGet("advances", s), fbGet("leaves", s)]); setEmployees(es ? Object.entries(es).map(([id, v]) => ({ ...v, id })) : []); setBranches(bs ? Object.entries(bs).map(([id, v]) => ({ ...v, id })) : []); setAttendance(flatten(as)); setAdvances(flatten(avs)); setLeaves(flatten(ls)); }, []); const login = async (email, password) => { const d = await signIn(email, password), p = await fbGet(`employees/${d.localId}`, d.idToken); if (!p)
+            React.createElement(Btn, { onClick: () => onDecision(x, "approved") }, "موافقة"),
+            React.createElement(Btn, { kind: "danger", onClick: () => onDecision(x, "rejected") }, "رفض")) : React.createElement(Badge, { tone: x.status === "approved" ? "green" : "red" }, x.status))))); }
+function App() { const [session, setSession] = useState(null), [profile, setProfile] = useState(null), [employees, setEmployees] = useState([]), [branches, setBranches] = useState([]), [attendance, setAttendance] = useState([]), [advances, setAdvances] = useState([]), [leaves, setLeaves] = useState([]), [loading, setLoading] = useState(true); const load = useCallback(async (s, p) => { const [es, bs, as, avs, ls] = await Promise.all([fbGet("employees", s), fbGet("branches", s), fbGet("attendance", s), fbGet("advances", s), fbGet("leaves", s)]); setEmployees(es ? Object.entries(es).map(([id, v]) => ({ ...v, id })) : []); setBranches(bs ? Object.entries(bs).map(([id, v]) => ({ ...DEFAULT_BRANCH, ...v, id, radiusMeters: Math.min(300, Number(v.radiusMeters) || 300), requiredHours: 8, graceMinutes: 15 })) : [DEFAULT_BRANCH]); setAttendance(flatten(as)); setAdvances(flatten(avs)); setLeaves(flatten(ls)); }, []); const login = async (email, password) => { const d = await signIn(email, password), p = await fbGet(`employees/${d.localId}`, d.idToken); if (!p)
     throw Error("Employee profile not found."); const s = { idToken: d.idToken, refreshToken: d.refreshToken, uid: d.localId }; setSession(s); setProfile({ ...p, id: d.localId }); localStorage.setItem("tal_session", JSON.stringify({ refreshToken: d.refreshToken })); await load(s, p); }; useEffect(() => { (async () => { try {
     const z = JSON.parse(localStorage.getItem("tal_session") || "null");
     if (z?.refreshToken) {
@@ -366,7 +365,7 @@ else {
     const up = { checkOutTime: stamp, checkOutSelfie: selfie, checkOutDistance: distance, checkOutLat: lat, checkOutLng: lng, workHours: work, overtimeHours: ot, verified: true };
     await fbPatch(`attendance/${session.uid}/${date}`, up, session.idToken);
     setAttendance(a => a.map(x => x.employeeId === session.uid && x.date === date ? { ...x, ...up } : x));
-} }; const addAdvance = async ({ amount, installments }) => { const id = uid(), r = { id, employeeId: session.uid, amount, installmentsCount: installments, installmentAmount: Math.round(amount / installments * 100) / 100, remainingInstallments: installments, status: "pending", requestDate: today() }; await fbPut(`advances/${session.uid}/${id}`, r, session.idToken); setAdvances(a => [...a, r]); }; const addLeave = async (x) => { const id = uid(), r = { ...x, id, employeeId: session.uid, status: "pending" }; await fbPut(`leaves/${session.uid}/${id}`, r, session.idToken); setLeaves(a => [...a, r]); }; const addEmp = async (x) => { const d = await signUp(x.email, x.password), id = d.localId, r = { id, name: x.name, role: "employee", baseSalary: Number(x.baseSalary) || 0, paymentMethod: x.paymentMethod, networkAmount: Number(x.networkAmount) || 0, branchId: x.branchId, active: true, email: x.email }; await fbPut(`employees/${id}`, r, session.idToken); setEmployees(e => [...e, r]); }; const updateEmp = async (id, p) => { const r = { ...p, baseSalary: Number(p.baseSalary) || 0, networkAmount: Number(p.networkAmount) || 0 }; await fbPatch(`employees/${id}`, r, session.idToken); setEmployees(e => e.map(x => x.id === id ? { ...x, ...r } : x)); }; const deactivate = async (id) => { await fbPatch(`employees/${id}`, { active: false }, session.idToken); setEmployees(e => e.map(x => x.id === id ? { ...x, active: false } : x)); }; const saveBranch = async (b) => { await fbPut(`branches/${b.id}`, b, session.idToken); setBranches(x => x.map(y => y.id === b.id ? b : y)); }; const addBranch = async (b) => { await fbPut(`branches/${b.id}`, b, session.idToken); setBranches(x => [...x, b]); }; const deleteBranch = async (id) => { await fbDelete(`branches/${id}`, session.idToken); setBranches(x => x.filter(b => b.id !== id)); }; const decision = async (r, status, type) => { const path = type === "leave" ? "leaves" : "advances"; await fbPatch(`${path}/${r.employeeId}/${r.id}`, { status }, session.idToken); const set = type === "leave" ? setLeaves : setAdvances; set(a => a.map(x => x.id === r.id && x.employeeId === r.employeeId ? { ...x, status } : x)); }; if (loading)
+} }; const addAdvance = async ({ amount, installments }) => { const id = uid(), r = { id, employeeId: session.uid, amount, installmentsCount: installments, installmentAmount: Math.round(amount / installments * 100) / 100, remainingInstallments: installments, status: "pending", requestDate: today() }; await fbPut(`advances/${session.uid}/${id}`, r, session.idToken); setAdvances(a => [...a, r]); }; const addLeave = async (x) => { const id = uid(), r = { ...x, id, employeeId: session.uid, status: "pending" }; await fbPut(`leaves/${session.uid}/${id}`, r, session.idToken); setLeaves(a => [...a, r]); }; const addEmp = async (x) => { const d = await signUp(x.email, x.password), id = d.localId, r = { id, name: x.name, role: "employee", baseSalary: Number(x.baseSalary) || 0, paymentMethod: x.paymentMethod, networkAmount: Number(x.networkAmount) || 0, branchId: x.branchId, active: true, email: x.email }; await fbPut(`employees/${id}`, r, session.idToken); setEmployees(e => [...e, r]); }; const updateEmp = async (id, p) => { const r = { ...p, baseSalary: Number(p.baseSalary) || 0, networkAmount: Number(p.networkAmount) || 0 }; await fbPatch(`employees/${id}`, r, session.idToken); setEmployees(e => e.map(x => x.id === id ? { ...x, ...r } : x)); }; const deactivate = async (id) => { await fbPatch(`employees/${id}`, { active: false }, session.idToken); setEmployees(e => e.map(x => x.id === id ? { ...x, active: false } : x)); }; const saveBranch = async (b) => { b = { ...b, lat: Number(b.lat) || DEFAULT_BRANCH.lat, lng: Number(b.lng) || DEFAULT_BRANCH.lng, radiusMeters: Math.min(300, Number(b.radiusMeters) || 300), requiredHours: 8, graceMinutes: 15 }; await fbPut(`branches/${b.id}`, b, session.idToken); setBranches(x => x.map(y => y.id === b.id ? b : y)); }; const addBranch = async (b) => { b = { ...b, lat: Number(b.lat) || DEFAULT_BRANCH.lat, lng: Number(b.lng) || DEFAULT_BRANCH.lng, radiusMeters: Math.min(300, Number(b.radiusMeters) || 300), requiredHours: 8, graceMinutes: 15 }; await fbPut(`branches/${b.id}`, b, session.idToken); setBranches(x => [...x, b]); }; const deleteBranch = async (id) => { await fbDelete(`branches/${id}`, session.idToken); setBranches(x => x.filter(b => b.id !== id)); }; const decision = async (r, status, type) => { const path = type === "leave" ? "leaves" : "advances"; await fbPatch(`${path}/${r.employeeId}/${r.id}`, { status }, session.idToken); const set = type === "leave" ? setLeaves : setAdvances; set(a => a.map(x => x.id === r.id && x.employeeId === r.employeeId ? { ...x, status } : x)); }; if (loading)
     return React.createElement("div", { className: "app-bg min-h-screen grid place-items-center" }, "Loading\u2026"); if (!session)
     return React.createElement(Login, { onLogin: login }); return React.createElement("div", { className: "app-bg min-h-screen" }, profile.role === "admin" ? React.createElement(Admin, { profile: profile, employees: employees, branches: branches, attendance: attendance, advances: advances, leaves: leaves, onLogout: logout, onAddEmployee: addEmp, onUpdateEmployee: updateEmp, onDeactivate: deactivate, onSaveBranch: saveBranch, onAddBranch: addBranch, onDeleteBranch: deleteBranch, onDecision: (r, s) => decision(r, s, "advance"), onLeaveDecision: (r, s) => decision(r, s, "leave") }) : React.createElement(Employee, { user: profile, branch: branch, attendance: attendance.filter(a => a.employeeId === session.uid), advances: advances.filter(a => a.employeeId === session.uid), leaves: leaves.filter(a => a.employeeId === session.uid), onAttendance: addAttendance, onAdvance: addAdvance, onLeave: addLeave, onLogout: logout })); }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App, null));
