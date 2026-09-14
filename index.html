@@ -131,12 +131,31 @@ function normalizeImportedEmployee(e){
  if(!e||typeof e!=="object")return e||{};
  const code=employeeCodeOf(e);
  const hit=code?PDF_EMPLOYEE_IMPORT.find(x=>String(x.no)===code):null;
- if(hit&&(!e.sourcePdf||String(e.sourcePdf).includes('Tal Albarka')||String(e.id||'').startsWith('pdf-aug-2026-'))){
-  return {...e,name:String(e.name||'').trim()||hit.name,employeeCode:String(e.employeeCode||e.pdfNo||code),baseSalary:Number(e.baseSalary)>0?Number(e.baseSalary):Number(hit.baseSalary)||0,networkAmount:Number(e.networkAmount)>0?Number(e.networkAmount):Number(hit.bank)||0,paymentMethod:e.paymentMethod||(hit.bank>0?(hit.cash>0?'split':'bank'):'cash'),pdfBaseSalary:Number(hit.baseSalary)||0,pdfOvertime:Number(hit.overtime)||0,pdfCash:Number(hit.cash)||0,pdfBank:Number(hit.bank)||0,pdfNet:Number(hit.net)||0};
+ if(hit){
+  const nameValue=[e.name,e.fullName,e.displayName,e.employeeName,e.nameAr,e.pdfName].find(v=>String(v||'').trim()&&String(v).trim()!=="موظف");
+  const base=Number(e.baseSalary);
+  const net=Number(e.networkAmount);
+  return {...e,name:String(nameValue||hit.name).trim(),employeeCode:String(e.employeeCode||e.pdfNo||code),baseSalary:Number.isFinite(base)&&base>0?base:Number(hit.baseSalary)||0,networkAmount:Number.isFinite(net)&&net>0?net:Number(hit.bank)||0,paymentMethod:e.paymentMethod||(hit.bank>0?(hit.cash>0?'split':'bank'):'cash'),pdfBaseSalary:Number(hit.baseSalary)||0,pdfOvertime:Number(hit.overtime)||0,pdfCash:Number(hit.cash)||0,pdfBank:Number(hit.bank)||0,pdfNet:Number(hit.net)||0};
  }
  return e;
 }
-function payrollFor(e,records,advances,month,adjustments=[]){e=normalizeImportedEmployee(e||{});records=Array.isArray(records)?records:[];advances=Array.isArray(advances)?advances:[];adjustments=Array.isArray(adjustments)?adjustments:[];const baseSalary=Math.max(0,Number(e.baseSalary)||0),hourly=baseSalary/(26*8);let regular=0,ot=0;records.forEach(r=>{const m=shiftMetrics(r,r.branch||{});regular+=Number(m.regular)||0;ot+=Number(m.ot)||0});const manual=Number(adjustments.find(a=>employeeMatches(a,e)&&String(a.month||'')===String(month||''))?.overtimeHours||0);const totalOt=ot+manual;const installment=advances.filter(a=>employeeMatches(a,e)&&a.status==="approved"&&Number(a.remainingInstallments)>0).reduce((s,a)=>s+Number(a.installmentAmount||0),0);const settlement=advances.filter(a=>employeeMatches(a,e)&&a.settlementRequest?.status==="approved"&&a.settlementRequest?.deductionMonth===month).reduce((s,a)=>s+Number(a.settlementRequest.amount||0),0);const regularPay=Math.min(baseSalary,regular*hourly),overtimePay=totalOt*hourly;const gross=Math.max(0,regularPay+overtimePay);const net=Math.max(0,gross-installment-settlement);const configuredNetwork=Math.max(0,Number(e.networkAmount)||0);const network=e.paymentMethod==="bank"?net:e.paymentMethod==="split"?Math.min(configuredNetwork,net):0;return{hourly,regular,ot:totalOt,attendanceOt:ot,manualOt:manual,baseSalary,regularPay,overtimePay,gross,installment,settlement,net,network,cash:Math.max(0,net-network),configuredNetwork};}
+function payrollFor(e,records,advances,month,adjustments=[]){
+ e=normalizeImportedEmployee(e||{});records=Array.isArray(records)?records:[];advances=Array.isArray(advances)?advances:[];adjustments=Array.isArray(adjustments)?adjustments:[];
+ const baseSalary=Math.max(0,Number(e.baseSalary)||0),hourly=baseSalary/(26*8);
+ let regular=0,attendanceOt=0;
+ records.forEach(r=>{const m=shiftMetrics(r,r.branch||{});regular+=Number(m.regular)||0;attendanceOt+=Number(m.ot)||0});
+ const manual=Number(adjustments.find(a=>employeeMatches(a,e)&&String(a.month||'')===String(month||''))?.overtimeHours||0);
+ const totalOt=attendanceOt+manual;
+ const installment=advances.filter(a=>employeeMatches(a,e)&&a.status==="approved"&&Number(a.remainingInstallments)>0).reduce((s,a)=>s+Number(a.installmentAmount||0),0);
+ const settlement=advances.filter(a=>employeeMatches(a,e)&&a.settlementRequest?.status==="approved"&&a.settlementRequest?.deductionMonth===month).reduce((s,a)=>s+Number(a.settlementRequest.amount||0),0);
+ const regularPay=Math.min(baseSalary,Math.max(0,regular)*hourly);
+ const overtimePay=Math.max(0,totalOt)*hourly;
+ const gross=Math.max(0,regularPay+overtimePay);
+ const net=Math.max(0,gross-installment-settlement);
+ const configuredNetwork=Math.max(0,Number(e.networkAmount)||0);
+ const network=e.paymentMethod==="bank"?net:e.paymentMethod==="split"?Math.min(configuredNetwork,net):0;
+ return{hourly,regular,ot:totalOt,attendanceOt,manualOt:manual,baseSalary,regularPay,overtimePay,gross,installment,settlement,net,network,cash:Math.max(0,net-network),configuredNetwork};
+}
 function GeoBox({loc}){if(!loc)return null;return h("div",{className:"mt-4 rounded-2xl p-4 bg-black/15 border border-white/10"},loc.status==="checking"?h("div",{className:"muted"},"جارٍ تحديد موقعك والتحقق من الفرع…"):loc.status==="locationMissing"?h("div",{className:"text-amber-200 font-bold"},"موقع هذا الفرع لم يتم استكماله بعد من المشرف."):h("div",{className:"flex items-center justify-between gap-3"},h("div",null,h("div",{className:`font-bold ${loc.ok?"text-emerald-300":"text-red-300"}`},loc.ok?"تم التحقق من موقع العمل":"أنت خارج نطاق الفرع"),h("div",{className:"text-sm muted mt-1"},`المسافة: ${loc.d} متر • المسموح: ${loc.allowed} متر`)),h(Badge,{tone:loc.ok?"green":"red",children:loc.ok?"مسموح":"مرفوض"}))) }
 function SettlementModal({advance,onCancel,onSend}){const max=Math.max(0,Number(advance.remainingBalance??((advance.remainingInstallments||0)*(advance.installmentAmount||0)))),[amt,setAmt]=useState(String(max));return h("div",{className:"fixed inset-0 bg-black/80 z-50 grid place-items-center p-4"},h(Card,{className:"w-full max-w-sm"},h("h3",{className:"font-black text-lg"},"طلب سداد المتبقي من السلفة"),h("div",{className:"muted text-sm mt-2"},`المتبقي: ${money(max)} ريال`),h("input",{className:"field mt-4",type:"number",min:"0",max,max,value:amt,onChange:e=>setAmt(e.target.value)}),h("div",{className:"flex gap-2 mt-4"},h(Btn,{kind:"secondary",onClick:onCancel,children:"إلغاء"}),h(Btn,{onClick:()=>onSend({amount:Math.min(Number(amt)||0,max)}),children:"إرسال الطلب"}))))}
 function Employee({user,branch,attendance,advances,leaves,payrollAdjustments=[],onAttendance,onAdvance,onSettlement,onLeave,onLogout}){
@@ -240,7 +259,7 @@ function employeeCodeOf(e){
 }
 function employeeName(e){
  if(!e)return "موظف";
- const direct=[e.name,e.fullName,e.displayName,e.employeeName,e.nameAr,e.pdfName].find(v=>String(v||"").trim());
+ const direct=[e.name,e.fullName,e.displayName,e.employeeName,e.nameAr,e.pdfName].find(v=>String(v||'').trim()&&String(v).trim()!=="موظف");
  if(direct)return String(direct).trim();
  const code=employeeCodeOf(e);
  if(code){const hit=PDF_EMPLOYEE_IMPORT.find(x=>String(x.no)===code);if(hit?.name)return hit.name;}
@@ -274,7 +293,9 @@ function payrollPdf(report,month,logo,companyName="Tal Al Baraka"){
 function Admin({profile,employees,branches,attendance,advances,leaves,payrollAdjustments,onLogout,onAddEmployee,onUpdateEmployee,onDeactivate,onSaveBranch,onAddBranch,onDeleteBranch,onDecision,onLeaveDecision,onUpdateAttendance,onImportPdf,onSavePayrollAdjustment,onResetPassword}){
  const [tab,setTab]=useState("home"),[month,setMonth]=useState(monthKey(today())),[tick,setTick]=useState(0),[newE,setNewE]=useState({name:"",email:"",password:"",baseSalary:"",paymentMethod:"cash",networkAmount:"",branchId:(Array.isArray(branches)?branches:[]).find(Boolean)?.id||""}),[newB,setNewB]=useState(""),[edit,setEdit]=useState(null),[accountType,setAccountType]=useState("employee"),[adminPerms,setAdminPerms]=useState(Object.fromEntries(ADMIN_PERMISSION_LIST.map(x=>[x[0],true])));
  const importPdf=()=>onImportPdf();
- useEffect(()=>{const t=setInterval(()=>setTick(x=>x+1),60000);return()=>clearInterval(t)},[]);
+ useEffect(()=>{const t=setInterval(()=>setTick(x=>x+1),15000);return()=>clearInterval(t)},[]);
+ useEffect(()=>{if(!session||!profile)return;let busy=false;const sync=async()=>{if(busy)return;busy=true;try{await load(session,profile)}catch(e){console.warn("تعذر تحديث بيانات الرواتب والحضور",e)}finally{busy=false}};const onFocus=()=>sync();const onVisible=()=>{if(document.visibilityState==="visible")sync()};sync();const t=setInterval(sync,30000);window.addEventListener("focus",onFocus);document.addEventListener("visibilitychange",onVisible);return()=>{clearInterval(t);window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",onVisible)}},[session?.uid,profile?.role,load]);
+ useEffect(()=>{const t=setInterval(()=>{const m=monthKey(today());if(m!==month)setMonth(m)},60000);return()=>clearInterval(t)},[month]);
  const safeEmployees=enrichEmployees(employees);const safeBranches=(Array.isArray(branches)?branches:[]).filter(Boolean);const safeAttendance=(Array.isArray(attendance)?attendance:[]).filter(Boolean);const safeAdvances=(Array.isArray(advances)?advances:[]).filter(Boolean);const safeLeaves=(Array.isArray(leaves)?leaves:[]).filter(Boolean);const safeAdjustments=(Array.isArray(payrollAdjustments)?payrollAdjustments:[]).filter(Boolean);const active=safeEmployees.filter(e=>e.role!=="admin"&&e.active!==false);
  const report=useMemo(()=>active.map(e=>{const rs=safeAttendance.filter(a=>employeeMatches(a,e)&&monthKey(String(a.date||''))===month);const records=rs.map(a=>({...a,branch:recordBranch(a,e,safeBranches)}));return {...payrollFor(e,records,safeAdvances,month,safeAdjustments),e,present:rs.filter(a=>a.checkInTime).length,records}}),[active,attendance,branches,advances,payrollAdjustments,month,tick]);
  const pendingSettlements=safeAdvances.filter(a=>a.settlementRequest?.status==="pending");
