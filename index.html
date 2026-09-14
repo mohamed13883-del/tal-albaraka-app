@@ -56,11 +56,15 @@ const photoOf = e => {
   const expanded=[];
   direct.forEach(x=>{
     if(typeof x==="string"&&x.trim()) expanded.push(x.trim());
-    else if(x&&typeof x==="object") expanded.push(x.data,x.url,x.src,x.base64,x.value,x.photoData,x.imageData,x.photoURL);
+    else if(x&&typeof x==="object") expanded.push(x.data,x.url,x.src,x.base64,x.value,x.photoData,x.imageData,x.photoURL,x.downloadURL);
   });
-  const nested=[e.profile,e.user,e.employee,e.personalData,e.profileData,e.photoDataObject,e.photoObject,e.photo];
   const valid=expanded.filter(x=>typeof x==="string"&&x.trim());
-  return valid.find(x=>/^data:image\//i.test(x)) || valid.find(x=>/^https?:\/\//i.test(x)) || valid[0] || nested.map(photoOf).find(Boolean) || "";
+  const data=valid.find(x=>/^data:image\//i.test(x));
+  if(data) return data;
+  const url=valid.find(x=>/^(https?:|blob:)/i.test(x));
+  if(url) return url;
+  const nested=[e.profile,e.user,e.employee,e.personalData,e.profileData,e.photoDataObject,e.photoObject];
+  return valid[0] || nested.map(photoOf).find(Boolean) || "";
 };
 const normalizePhotoRecord = (id,v={}) => { const photo=photoOf(v); return photo ? {...v,photoData:photo,profilePhoto:photo,photo, image:photo, avatar:photo} : v; };
 const salaryOf = e => {
@@ -84,29 +88,32 @@ const signIn = (email, password) => auth("signInWithPassword", { email, password
 const signUp = (email, password) => auth("signUp", { email, password, returnSecureToken: true });
 const refresh = async (token) => { const r = await fetch(`${REFRESH_BASE}?key=${FIREBASE_API_KEY}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(token)}` }); const d = await r.json(); if (!r.ok)
     throw Error("Session refresh failed"); return { idToken: d.id_token, refreshToken: d.refresh_token, expiresIn: d.expires_in }; };
-async function fbGet(path, token) { const r = await fetch(`${DB_URL}/${path}.json?auth=${token}`); if(r.status===401) throw Error("AUTH_EXPIRED"); return r.ok ? r.json() : null; }
-async function fbPut(path, data, token) { const r = await fetch(`${DB_URL}/${path}.json?auth=${token}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); if (!r.ok)
-    throw Error("Database write failed"); }
-async function fbPatch(path, data, token) { const r = await fetch(`${DB_URL}/${path}.json?auth=${token}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); if (!r.ok)
-    throw Error("Database update failed"); }
-async function fbDelete(path, token) { await fetch(`${DB_URL}/${path}.json?auth=${token}`, { method: "DELETE" }); }
+const tokenOf = token => typeof token === "string" ? token : (token?.idToken || token?.token || "");
+async function fbGet(path, token) { const t=tokenOf(token); const r=await fetch(`${DB_URL}/${path}.json?auth=${encodeURIComponent(t)}`); if(r.status===401) throw Error("AUTH_EXPIRED"); return r.ok ? r.json() : null; }
+async function fbPut(path, data, token) { const t=tokenOf(token); const r=await fetch(`${DB_URL}/${path}.json?auth=${encodeURIComponent(t)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); if(r.status===401) throw Error("AUTH_EXPIRED"); if(!r.ok) throw Error("Database write failed"); return r.json(); }
+async function fbPatch(path, data, token) { const t=tokenOf(token); const r=await fetch(`${DB_URL}/${path}.json?auth=${encodeURIComponent(t)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); if(r.status===401) throw Error("AUTH_EXPIRED"); if(!r.ok) throw Error("Database update failed"); return r.json(); }
+async function fbDelete(path, token) { const t=tokenOf(token); const r=await fetch(`${DB_URL}/${path}.json?auth=${encodeURIComponent(t)}`, { method: "DELETE" }); if(r.status===401) throw Error("AUTH_EXPIRED"); }
 function flatten(obj) {
-  if (!obj) return [];
-  if (Array.isArray(obj)) return obj.filter(Boolean).map((r,i)=>typeof r === "object" ? ({...r, employeeId:r.employeeId||r.uid||r.userId||"", id:r.id||r.date||r.day||String(i), date:r.date||r.day||r.attendanceDate||"", checkInTime:r.checkInTime||r.checkIn||r.inTime||r.clockIn||"", checkOutTime:r.checkOutTime||r.checkOut||r.outTime||r.clockOut||""}) : null).filter(Boolean);
+  if(!obj) return [];
   const out=[];
-  Object.entries(obj).forEach(([key,value])=>{
-    if (!value || typeof value !== "object") return;
-    const looksLikeRecord = !!(value.checkInTime || value.checkOutTime || value.date || value.employeeId || value.uid || value.workHours || value.overtimeHours);
-    if (looksLikeRecord) {
-      out.push({...value, employeeId:value.employeeId||value.uid||value.userId||key, id:value.id||value.date||value.day||key, date:value.date||value.day||value.attendanceDate||key, checkInTime:value.checkInTime||value.checkIn||value.inTime||value.clockIn||"", checkOutTime:value.checkOutTime||value.checkOut||value.outTime||value.clockOut||""});
+  const isRec=v=>v&&typeof v==="object"&&!Array.isArray(v)&&["checkInTime","checkOutTime","checkIn","checkOut","inTime","outTime","clockIn","clockOut","workHours","overtimeHours","employeeId","uid","userId","date","day","attendanceDate","recordDate"].some(k=>v[k]!==undefined&&v[k]!==null&&v[k]!=="");
+  const walk=(node,ownerId="",dateHint="")=>{
+    if(node==null) return;
+    if(Array.isArray(node)){node.forEach((v,i)=>walk(v,ownerId,dateHint||String(i)));return;}
+    if(typeof node!=="object") return;
+    if(isRec(node)){
+      const date=node.date||node.day||node.attendanceDate||node.recordDate||dateHint||"";
+      const employeeId=node.employeeId||node.uid||node.userId||node.authUid||ownerId||"";
+      out.push({...node,employeeId,id:node.id||date||dateHint||String(out.length),date,checkInTime:node.checkInTime||node.checkIn||node.inTime||node.clockIn||"",checkOutTime:node.checkOutTime||node.checkOut||node.outTime||node.clockOut||""});
       return;
     }
-    Object.entries(value).forEach(([k,r])=>{
-      if (!r || typeof r !== "object") return;
-      out.push({...r, employeeId:r.employeeId||r.uid||r.userId||key, id:r.id||r.date||r.day||k, date:r.date||r.day||r.attendanceDate||k, checkInTime:r.checkInTime||r.checkIn||r.inTime||r.clockIn||"", checkOutTime:r.checkOutTime||r.checkOut||r.outTime||r.clockOut||""});
+    Object.entries(node).forEach(([k,v])=>{
+      if(v&&typeof v==="object") walk(v,ownerId||(!/^\d{4}-\d{2}-\d{2}$/.test(k)?k:"") ,/^\d{4}-\d{2}-\d{2}$/.test(k)?k:dateHint);
     });
-  });
-  return out;
+  };
+  walk(obj);
+  const seen=new Set();
+  return out.filter(r=>{const key=[r.employeeId,r.date,r.checkInTime,r.checkOutTime,r.workHours,r.overtimeHours].join("|");if(seen.has(key))return false;seen.add(key);return true;});
 }
 const DEFAULT_BRANCH = { id: "main", name: "الفرع الرئيسي", lat: 21.4858, lng: 39.1925, radiusMeters: 300, shiftStart: "09:00", shiftEnd: "17:00", graceMinutes: 15, requiredHours: 8, monthlyWorkDays: 26, weeklyOffDays: 4 };
 const PDF_EMPLOYEE_IMPORT = [
@@ -168,7 +175,7 @@ function shiftMetrics(rec,branch){
   const work=Math.max(0,(co-ci)/60),before=Math.max(0,Math.min(work,(ss-ci)/60)),after=Math.max(0,Math.min(work,(co-se)/60)),regular=Math.min(8,Math.max(0,work-before-after));
   return{work,regular,otBefore:before,otAfter:after,ot:before+after};
 }
-function recordBranch(a,e,branches){if(a?.branchId)return branches.find(b=>b.id===a.branchId)||{...DEFAULT_BRANCH,id:a.branchId,name:a.branchName||DEFAULT_BRANCH.name,lat:a.branchLat??DEFAULT_BRANCH.lat,lng:a.branchLng??DEFAULT_BRANCH.lng,shiftStart:a.branchShiftStart||DEFAULT_BRANCH.shiftStart,shiftEnd:a.branchShiftEnd||DEFAULT_BRANCH.shiftEnd,radiusMeters:a.branchRadiusMeters??DEFAULT_BRANCH.radiusMeters};return branches.find(b=>b.id===e?.branchId)||branches[0]||DEFAULT_BRANCH}
+function recordBranch(a,e,branches){if(a?.branchId)return branches.find(b=>String(b.id)===String(a.branchId))||{...DEFAULT_BRANCH,id:a.branchId,name:a.branchName||DEFAULT_BRANCH.name,lat:a.branchLat??DEFAULT_BRANCH.lat,lng:a.branchLng??DEFAULT_BRANCH.lng,shiftStart:a.branchShiftStart||DEFAULT_BRANCH.shiftStart,shiftEnd:a.branchShiftEnd||DEFAULT_BRANCH.shiftEnd,radiusMeters:a.branchRadiusMeters??DEFAULT_BRANCH.radiusMeters};if(a?.branchName){const byName=(branches||[]).find(b=>String(b.name||"").trim().toLowerCase()===String(a.branchName||"").trim().toLowerCase());if(byName)return byName;}return branches.find(b=>String(b.id)===String(e?.branchId))||branches[0]||DEFAULT_BRANCH}
 function employeeMatchesRecord(e,r){const ids=[e?.id,e?.uid,e?.authUid,e?.userId,e?.employeeId,e?.employeeCode,e?.pdfNo,e?.email].filter(v=>v!==undefined&&v!==null&&String(v)!=="").map(String);const rids=[r?.employeeId,r?.uid,r?.userId,r?.authUid,r?.employeeCode,r?.pdfNo,r?.email].filter(v=>v!==undefined&&v!==null&&String(v)!=="").map(String);return rids.some(x=>ids.includes(x))||((e?.email||r?.email)&&String(e.email||"").toLowerCase()===String(r.email||"").toLowerCase());}
 function payrollFor(e,records,advances,month){
   const baseSalary=salaryOf(e),hourly=baseSalary/(26*8);
@@ -307,21 +314,34 @@ function Admin({profile,employees,branches,attendance,advances,leaves,onLogout,o
 async function resolveEmployeeForAuth(uid,email,token){
   const es=await fbGet("employees",token);
   if(!es)return null;
+  let photoStore={}; try{photoStore=await fbGet("employeePhotos",token)||{}}catch(e){}
   const entries=Object.entries(es);
-  const exactRaw=es[uid];
-  if(exactRaw){
-    let exact=normalizeEmployee(uid,exactRaw);
-    try{const ph=await fbGet(`employeePhotos/${uid}`,token);if(ph?.photoData && (!photoOf(exact)||/^data:image\//i.test(ph.photoData))) exact=normalizeEmployee(uid,{...exact,photoData:ph.photoData,profilePhoto:ph.photoData,photo:ph.photoData,image:ph.photoData,avatar:ph.photoData});}catch(e){}
-    return {...exact,authUid:uid};
-  }
   const em=String(email||"").trim().toLowerCase();
-  const hit=entries.find(([id,v])=>String(v?.email||"").trim().toLowerCase()===em || String(v?.authUid||"")===String(uid));
-  if(hit){
-    const [id,v]=hit; let emp=normalizeEmployee(id,v);
-    try{const ph=await fbGet(`employeePhotos/${id}`,token);if(ph?.photoData && (!photoOf(emp)||/^data:image\//i.test(ph.photoData))) emp=normalizeEmployee(id,{...emp,photoData:ph.photoData,profilePhoto:ph.photoData,photo:ph.photoData,image:ph.photoData,avatar:ph.photoData});}catch(e){}
-    return {...emp,authUid:uid};
+  const candidates=[];
+  if(es[uid]) candidates.push([uid,es[uid],3]);
+  entries.forEach(([id,v])=>{
+    if(String(v?.authUid||"")===String(uid) && id!==uid) candidates.push([id,v,4]);
+    if(em && String(v?.email||"").trim().toLowerCase()===em && id!==uid) candidates.push([id,v,5]);
+  });
+  if(!candidates.length)return null;
+  let best=null,bestScore=-1;
+  for(const [id,v,base] of candidates){
+    let photo=photoOf(v);
+    const stores=Object.entries(photoStore||{});
+    if(!photo){
+      const hit=photoStore?.[id] || photoStore?.[v?.authUid||""] || photoStore?.[uid];
+      photo=photoOf(hit);
+      if(!photo){
+        const sh=stores.find(([,x])=>String(x?.employeeId||"")===String(id)||String(x?.authUid||"")===String(uid)|| (em&&String(x?.email||"").toLowerCase()===em));
+        photo=photoOf(sh?.[1]);
+      }
+    }
+    const score=base+(photo?20:0)+(v?.name?2:0)+(v?.email?2:0);
+    if(score>bestScore){bestScore=score;best={id,v,photo};}
   }
-  return null;
+  if(!best)return null;
+  const merged=best.photo?{...best.v,photoData:best.photo,profilePhoto:best.photo,photo:best.photo,image:best.photo,avatar:best.photo}:best.v;
+  return {...normalizeEmployee(best.id,merged),authUid:uid};
 }
 async function repairEmployeePhotoRecord(id,raw,token,photoStore){
   let photo=photoOf(raw);
@@ -343,27 +363,31 @@ function startFirebaseStream(path,token,onChange){
   es.onerror=()=>{if(closed)es.close();};
   return ()=>{closed=true;es.close();};
 }
-function App(){const[session,setSession]=useState(null),[profile,setProfile]=useState(null),[employees,setEmployees]=useState([]),[branches,setBranches]=useState([]),[attendance,setAttendance]=useState([]),[advances,setAdvances]=useState([]),[leaves,setLeaves]=useState([]),[loading,setLoading]=useState(true);const load=useCallback(async(s)=>{const[es,bs,as,avs,ls,photoStore]=await Promise.all([fbGet("employees",s),fbGet("branches",s),fbGet("attendance",s),fbGet("advances",s),fbGet("leaves",s),fbGet("employeePhotos",s)]);const enrichedEmployees=es?Object.entries(es).map(([id,v])=>{const stored=photoStore?.[id]?.photoData||photoStore?.[v?.authUid||""]?.photoData||photoStore?.[v?.uid||""]?.photoData||"";return normalizeEmployee(id,stored?{...v,photoData:photoOf(v)||stored,profilePhoto:photoOf(v)||stored,photo:photoOf(v)||stored}:v)}):[];setEmployees(enrichedEmployees);setBranches(bs?Object.entries(bs).map(([id,v])=>({...DEFAULT_BRANCH,...v,id,radiusMeters:Math.min(300,Number(v.radiusMeters)||300),requiredHours:8,graceMinutes:15})):[]);setAttendance(flatten(as));setAdvances(flatten(avs));setLeaves(flatten(ls));if(s?.uid){
- const hit=Object.entries(es||{}).find(([id,v])=>String(id)===String(s.uid)||String(v?.authUid||"")===String(s.uid)||(s.email&&String(v?.email||"").trim().toLowerCase()===String(s.email).trim().toLowerCase()));
- if(hit){const [id,v]=hit;const ee=enrichedEmployees.find(x=>String(x.id)===String(id))||normalizeEmployee(id,v);setProfile(prev=>({...ee,...(prev||{}),authUid:s.uid,id:ee.id,photoData:photoOf(ee)||photoOf(prev)||""}));}
-}},[]);const login=async(email,password)=>{const d=await signIn(email,password);const s={idToken:d.idToken,refreshToken:d.refreshToken,uid:d.localId,email:d.email||email};const p=await resolveEmployeeForAuth(d.localId,d.email||email,d.idToken);if(!p)throw Error("لم يتم العثور على ملف الموظف المرتبط بهذا الحساب.");setSession(s);setProfile({...p,authUid:d.localId});localStorage.setItem("tal_session",JSON.stringify({refreshToken:d.refreshToken,email:d.email||email}));await load(s)};useEffect(()=>{(async()=>{try{const z=JSON.parse(localStorage.getItem("tal_session")||"null");if(z?.refreshToken){const r=await refresh(z.refreshToken),uidFrom=JSON.parse(atob(r.idToken.split(".")[1])).user_id;const p=await resolveEmployeeForAuth(uidFrom,z.email||"",r.idToken);if(p){const s={idToken:r.idToken,refreshToken:r.refreshToken,uid:uidFrom,email:z.email||p.email||""};setSession(s);setProfile({...p,authUid:uidFrom});await load(s)}}}catch(e){}setLoading(false)})()},[load]);useEffect(()=>{if(!session)return;const refreshData=async()=>{
-  try{
-    await load(session);
-    if(session.uid){
-      const fresh=await resolveEmployeeForAuth(session.uid,session.email||profile?.email||"",session.idToken);
-      if(fresh) setProfile(prev=>({...prev,...fresh,authUid:session.uid,photoData:photoOf(fresh)||photoOf(prev)||""}));
-    }
-  }catch(e){
-    if(e?.message==="AUTH_EXPIRED" && session.refreshToken){
-      try{const r=await refresh(session.refreshToken);const ns={...session,idToken:r.idToken,refreshToken:r.refreshToken};setSession(ns);localStorage.setItem("tal_session",JSON.stringify({refreshToken:r.refreshToken,email:session.email||""}));await load(ns);const fresh=await resolveEmployeeForAuth(ns.uid,ns.email||"",ns.idToken);if(fresh)setProfile(prev=>({...prev,...fresh,authUid:ns.uid,photoData:photoOf(fresh)||photoOf(prev)||""}));}catch(_){ }
-    }
+function App(){const[session,setSession]=useState(null),[profile,setProfile]=useState(null),[employees,setEmployees]=useState([]),[branches,setBranches]=useState([]),[attendance,setAttendance]=useState([]),[advances,setAdvances]=useState([]),[leaves,setLeaves]=useState([]),[loading,setLoading]=useState(true);const load=useCallback(async(s)=>{
+  const t=tokenOf(s);
+  const [es,bs,as,avs,ls]=await Promise.all([fbGet("employees",t),fbGet("branches",t),fbGet("attendance",t),fbGet("advances",t),fbGet("leaves",t)]);
+  let photoStore={}; try{photoStore=await fbGet("employeePhotos",t)||{}}catch(e){}
+  const enrichedEmployees=es?Object.entries(es).map(([id,v])=>{
+    let photo=photoOf(v);
+    const direct=photoStore?.[id]||photoStore?.[v?.authUid||""]||photoStore?.[v?.uid||""]||{};
+    if(!photo) photo=photoOf(direct);
+    if(!photo){const hit=Object.values(photoStore||{}).find(x=>String(x?.employeeId||"")===String(id)||String(x?.authUid||"")===String(v?.authUid||""));photo=photoOf(hit);}
+    return normalizeEmployee(id,photo?{...v,photoData:photo,profilePhoto:photo,photo,image:photo,avatar:photo}:v);
+  }):[];
+  setEmployees(enrichedEmployees);
+  setBranches(bs?Object.entries(bs).map(([id,v])=>({...DEFAULT_BRANCH,...v,id,radiusMeters:Math.min(300,Number(v.radiusMeters)||300),requiredHours:8,graceMinutes:15})):[]);
+  setAttendance(flatten(as)); setAdvances(flatten(avs)); setLeaves(flatten(ls));
+  if(s?.uid){
+    const p=await resolveEmployeeForAuth(s.uid,s.email||"",t).catch(()=>null);
+    if(p)setProfile(prev=>({...prev,...p,authUid:s.uid,photoData:photoOf(p)||photoOf(prev)||""}));
   }
-};refreshData();const id=setInterval(refreshData,1000);const vis=()=>{if(document.visibilityState==="visible")refreshData()};document.addEventListener("visibilitychange",vis);return()=>{clearInterval(id);document.removeEventListener("visibilitychange",vis)}},[session,load]);useEffect(()=>{
- if(!session)return;
- let timer=null; const trigger=()=>{clearTimeout(timer);timer=setTimeout(async()=>{try{await load(session);}catch(e){}},120);};
- const stops=["attendance","employees","employeePhotos"].map(path=>startFirebaseStream(path,session.idToken,trigger));
- return()=>{clearTimeout(timer);stops.forEach(fn=>fn&&fn());};
-},[session,load]);useEffect(()=>{if(!session?.uid)return;const e=employees.find(x=>String(x.id)===String(session.uid)||String(x.authUid||"")===String(session.uid)||(session.email&&String(x.email||"").toLowerCase()===String(session.email||"").toLowerCase()));if(e)setProfile(p=>({...p,...e,authUid:session.uid,photoData:photoOf(e)||photoOf(p)||""}))},[employees,session?.uid]);const logout=()=>{setSession(null);setProfile(null);localStorage.removeItem("tal_session")};const branch=branches.find(b=>b.id===profile?.branchId)||branches[0]||DEFAULT_BRANCH;const addAttendance=async({type,selfie,distance,lat,lng})=>{const date=today(),stamp=now();const activeBranch=branches.find(b=>b.id===profile?.branchId)||branch;if(type==="in"){const rec={id:date,employeeId:session.uid,authUid:session.uid,email:profile?.email||session.email||"",employeeCode:profile?.employeeCode||"",date,branchId:activeBranch.id,branchName:activeBranch.name,branchLat:Number(activeBranch.lat),branchLng:Number(activeBranch.lng),branchRadiusMeters:Math.min(300,Number(activeBranch.radiusMeters)||300),branchShiftStart:activeBranch.shiftStart,branchShiftEnd:activeBranch.shiftEnd,checkInTime:stamp,checkInSelfie:selfie,checkInDistance:distance,checkInLat:lat,checkInLng:lng,verified:true};await fbPut(`attendance/${session.uid}/${date}`,rec,session.idToken);setAttendance(a=>[...a.filter(x=>!(employeeMatchesRecord(profile,x)&&String(x.date||x.day||x.attendanceDate||"")===date)),rec])}else{const old=attendance.find(a=>employeeMatchesRecord(profile,a)&&String(a.date||a.day||a.attendanceDate||"")===date),m=shiftMetrics({...old,checkOutTime:stamp,date},activeBranch),up={checkOutTime:stamp,checkOutSelfie:selfie,checkOutDistance:distance,checkOutLat:lat,checkOutLng:lng,checkOutBranchId:activeBranch.id,checkOutBranchName:activeBranch.name,checkOutBranchLat:Number(activeBranch.lat),checkOutBranchLng:Number(activeBranch.lng),workHours:m.work,overtimeHours:m.ot,overtimeBefore:m.otBefore,overtimeAfter:m.otAfter,verified:true};await fbPatch(`attendance/${session.uid}/${date}`,up,session.idToken);setAttendance(a=>a.map(x=>employeeMatchesRecord(profile,x)&&String(x.date||x.day||x.attendanceDate||"")===date?{...x,...up}:x))}};const updateAttendance=async(r)=>{const nb=recordBranch(r,employees.find(e=>employeeMatchesRecord(e,r)),branches);const m=shiftMetrics(r,nb);const oldId=r._oldEmployeeId||r.employeeId,oldDate=r._oldDate||r.date;const clean={...r};delete clean._oldEmployeeId;delete clean._oldDate;Object.assign(clean,{employeeId:r.employeeId,branchId:nb.id,branchName:nb.name,branchLat:Number(nb.lat),branchLng:Number(nb.lng),branchRadiusMeters:Math.min(300,Number(nb.radiusMeters)||300),branchShiftStart:nb.shiftStart,branchShiftEnd:nb.shiftEnd,workHours:m.work,overtimeHours:m.ot,overtimeBefore:m.otBefore,overtimeAfter:m.otAfter,verified:true});if(String(oldId)!==String(r.employeeId)||String(oldDate)!==String(r.date))await fbDelete(`attendance/${oldId}/${oldDate}`,session.idToken);await fbPut(`attendance/${r.employeeId}/${r.date}`,clean,session.idToken);setAttendance(a=>[...a.filter(x=>!(String(x.employeeId)===String(oldId)&&String(x.date)===String(oldDate))&&!(String(x.employeeId)===String(r.employeeId)&&String(x.date)===String(r.date))),clean])};const addAdvance=async({amount,installments})=>{const id=uid(),r={id,employeeId:session.uid,amount,installmentsCount:installments,installmentAmount:Math.round(amount/installments*100)/100,remainingInstallments:installments,remainingBalance:Number(amount),status:"pending",requestDate:today()};await fbPut(`advances/${session.uid}/${id}`,r,session.idToken);setAdvances(a=>[...a,r])};const addSettlement=async(a,{amount})=>{if(!amount)return;const req={id:uid(),amount,date:today(),status:"pending"};await fbPatch(`advances/${session.uid}/${a.id}`,{settlementRequest:req},session.idToken);setAdvances(x=>x.map(y=>y.id===a.id?{...y,settlementRequest:req}:y))};const addLeave=async(x)=>{const id=uid(),r={...x,id,employeeId:session.uid,status:"pending"};await fbPut(`leaves/${session.uid}/${id}`,r,session.idToken);setLeaves(a=>[...a,r])};const addEmp=async(x)=>{const d=await signUp(x.email,x.password),id=d.localId,photo=photoOf(x),r=normalizePhotoRecord(id,{id,name:x.name,role:x.role||"employee",baseSalary:Number(x.baseSalary)||0,paymentMethod:x.paymentMethod||"cash",networkAmount:Number(x.networkAmount)||0,branchId:x.branchId||"",permissions:x.permissions||null,active:true,email:x.email,photoData:photo||"",profilePhoto:photo||"",photo:photo||"",image:photo||"",avatar:photo||"",authUid:id});await fbPut(`employees/${id}`,r,session.idToken);await fbPut(`employeePhotos/${id}`,{photoData:photo||"",updatedAt:Date.now(),employeeId:id},session.idToken);setEmployees(e=>[...e,normalizeEmployee(id,r)])};const importPdf=async()=>{const branchByName=async n=>{let b=branches.find(b=>b.name===n)||branches.find(b=>b.name.includes(n))||branches.find(b=>n.includes(b.name));if(b)return b;const id="pdf-branch-"+n.replace(/\s+/g,"-");b={...DEFAULT_BRANCH,id,name:n,needsLocationSetup:true};await fbPut(`branches/${id}`,b,session.idToken);return b};let added=0;for(const x of PDF_EMPLOYEE_IMPORT){const exists=employees.find(e=>e.pdfNo===x.no&&e.sourcePdf==="Tal Albarka_August 2026.pdf")||employees.find(e=>e.name===x.name&&e.role!=="admin");if(exists)continue;const b=await branchByName(x.branch);const id="pdf-aug-2026-"+x.no;const r={id,name:x.name,role:"employee",baseSalary:Number(x.baseSalary),paymentMethod:x.bank>0?(x.cash>0?"split":"bank"):"cash",networkAmount:x.bank,branchId:b.id,active:true,email:"",phone:"",nationalId:"",jobTitle:"",hireDate:"",address:"",bankAccount:"",photoData:"",employeeCode:String(x.no),needsCompletion:true,sourcePdf:"Tal Albarka_August 2026.pdf",pdfNo:x.no,pdfBranch:x.branch,pdfCash:x.cash,pdfBank:x.bank,pdfOvertime:x.overtime,pdfBaseSalary:x.baseSalary,pdfAdvanceDeduction:x.advanceDeduction,pdfNet:x.net};await fbPut(`employees/${id}`,r,session.idToken);added++;}if(added){const es=await fbGet("employees",session.idToken),bs=await fbGet("branches",session.idToken);setEmployees(es?Object.entries(es).map(([id,v])=>normalizeEmployee(id,v)):[]);setBranches(bs?Object.entries(bs).map(([id,v])=>({...DEFAULT_BRANCH,...v,id,radiusMeters:Math.min(300,Number(v.radiusMeters)||300),requiredHours:8,graceMinutes:15})):[]);alert(`تم استيراد ${added} موظف من ملف PDF. يرجى استكمال البريد وكلمة المرور والصورة والبيانات الناقصة من خلال التعديل.`)}else alert("الموظفون الموجودون من ملف PDF سبق استيرادهم.")};
+},[]);
+const login=async(email,password)=>{const d=await signIn(email,password);const s={idToken:d.idToken,refreshToken:d.refreshToken,uid:d.localId,email:d.email||email};const p=await resolveEmployeeForAuth(d.localId,d.email||email,d.idToken);if(!p)throw Error("لم يتم العثور على ملف الموظف المرتبط بهذا الحساب.");setSession(s);setProfile({...p,authUid:d.localId});localStorage.setItem("tal_session",JSON.stringify({refreshToken:d.refreshToken,email:d.email||email}));await load(s)};
+useEffect(()=>{(async()=>{try{const z=JSON.parse(localStorage.getItem("tal_session")||"null");if(z?.refreshToken){const r=await refresh(z.refreshToken),uidFrom=JSON.parse(atob(r.idToken.split(".")[1])).user_id;const p=await resolveEmployeeForAuth(uidFrom,z.email||"",r.idToken);if(p){const s={idToken:r.idToken,refreshToken:r.refreshToken,uid:uidFrom,email:z.email||p.email||""};setSession(s);setProfile({...p,authUid:uidFrom});await load(s)}}}catch(e){}setLoading(false)})()},[load]);
+useEffect(()=>{if(!session)return;let busy=false;const refreshData=async()=>{if(busy)return;busy=true;try{await load(session)}catch(e){if(e?.message==="AUTH_EXPIRED"&&session.refreshToken){try{const r=await refresh(session.refreshToken);const ns={...session,idToken:r.idToken,refreshToken:r.refreshToken};setSession(ns);localStorage.setItem("tal_session",JSON.stringify({refreshToken:r.refreshToken,email:session.email||""}));await load(ns)}catch(_){}}}finally{busy=false}};refreshData();const id=setInterval(refreshData,2000);const vis=()=>{if(document.visibilityState==="visible")refreshData()};document.addEventListener("visibilitychange",vis);return()=>{clearInterval(id);document.removeEventListener("visibilitychange",vis)}},[session,load]);
+useEffect(()=>{if(!session)return;let timer=null;const trigger=()=>{clearTimeout(timer);timer=setTimeout(()=>load(session).catch(()=>{}),100)};const stops=["attendance","employees","employeePhotos"].map(path=>startFirebaseStream(path,session.idToken,trigger));return()=>{clearTimeout(timer);stops.forEach(fn=>fn&&fn())}},[session,load]);
+useEffect(()=>{if(!session?.uid)return;const e=employees.find(x=>String(x.id)===String(session.uid)||String(x.authUid||"")===String(session.uid)||(session.email&&String(x.email||"").toLowerCase()===String(session.email||"").toLowerCase()));if(e)setProfile(p=>({...p,...e,authUid:session.uid,photoData:photoOf(e)||photoOf(p)||""}))},[employees,session?.uid]);
+const logout=()=>{setSession(null);setProfile(null);localStorage.removeItem("tal_session")};const branch=branches.find(b=>b.id===profile?.branchId)||branches[0]||DEFAULT_BRANCH;const addAttendance=async({type,selfie,distance,lat,lng})=>{const date=today(),stamp=now();const activeBranch=branches.find(b=>b.id===profile?.branchId)||branch;if(type==="in"){const rec={id:date,employeeId:session.uid,authUid:session.uid,email:profile?.email||session.email||"",employeeCode:profile?.employeeCode||"",date,branchId:activeBranch.id,branchName:activeBranch.name,branchLat:Number(activeBranch.lat),branchLng:Number(activeBranch.lng),branchRadiusMeters:Math.min(300,Number(activeBranch.radiusMeters)||300),branchShiftStart:activeBranch.shiftStart,branchShiftEnd:activeBranch.shiftEnd,checkInTime:stamp,checkInSelfie:selfie,checkInDistance:distance,checkInLat:lat,checkInLng:lng,verified:true};await fbPut(`attendance/${session.uid}/${date}`,rec,session.idToken);setAttendance(a=>[...a.filter(x=>!(employeeMatchesRecord(profile,x)&&String(x.date||x.day||x.attendanceDate||"")===date)),rec])}else{const old=attendance.find(a=>employeeMatchesRecord(profile,a)&&String(a.date||a.day||a.attendanceDate||"")===date),m=shiftMetrics({...old,checkOutTime:stamp,date},activeBranch),up={checkOutTime:stamp,checkOutSelfie:selfie,checkOutDistance:distance,checkOutLat:lat,checkOutLng:lng,checkOutBranchId:activeBranch.id,checkOutBranchName:activeBranch.name,checkOutBranchLat:Number(activeBranch.lat),checkOutBranchLng:Number(activeBranch.lng),workHours:m.work,overtimeHours:m.ot,overtimeBefore:m.otBefore,overtimeAfter:m.otAfter,verified:true};await fbPatch(`attendance/${session.uid}/${date}`,up,session.idToken);setAttendance(a=>a.map(x=>employeeMatchesRecord(profile,x)&&String(x.date||x.day||x.attendanceDate||"")===date?{...x,...up}:x))}};const updateAttendance=async(r)=>{const nb=recordBranch(r,employees.find(e=>employeeMatchesRecord(e,r)),branches);const m=shiftMetrics(r,nb);const oldId=r._oldEmployeeId||r.employeeId,oldDate=r._oldDate||r.date;const clean={...r};delete clean._oldEmployeeId;delete clean._oldDate;Object.assign(clean,{employeeId:r.employeeId,branchId:nb.id,branchName:nb.name,branchLat:Number(nb.lat),branchLng:Number(nb.lng),branchRadiusMeters:Math.min(300,Number(nb.radiusMeters)||300),branchShiftStart:nb.shiftStart,branchShiftEnd:nb.shiftEnd,workHours:m.work,overtimeHours:m.ot,overtimeBefore:m.otBefore,overtimeAfter:m.otAfter,verified:true});if(String(oldId)!==String(r.employeeId)||String(oldDate)!==String(r.date))await fbDelete(`attendance/${oldId}/${oldDate}`,session.idToken);await fbPut(`attendance/${r.employeeId}/${r.date}`,clean,session.idToken);setAttendance(a=>[...a.filter(x=>!(String(x.employeeId)===String(oldId)&&String(x.date)===String(oldDate))&&!(String(x.employeeId)===String(r.employeeId)&&String(x.date)===String(r.date))),clean])};const addAdvance=async({amount,installments})=>{const id=uid(),r={id,employeeId:session.uid,amount,installmentsCount:installments,installmentAmount:Math.round(amount/installments*100)/100,remainingInstallments:installments,remainingBalance:Number(amount),status:"pending",requestDate:today()};await fbPut(`advances/${session.uid}/${id}`,r,session.idToken);setAdvances(a=>[...a,r])};const addSettlement=async(a,{amount})=>{if(!amount)return;const req={id:uid(),amount,date:today(),status:"pending"};await fbPatch(`advances/${session.uid}/${a.id}`,{settlementRequest:req},session.idToken);setAdvances(x=>x.map(y=>y.id===a.id?{...y,settlementRequest:req}:y))};const addLeave=async(x)=>{const id=uid(),r={...x,id,employeeId:session.uid,status:"pending"};await fbPut(`leaves/${session.uid}/${id}`,r,session.idToken);setLeaves(a=>[...a,r])};const addEmp=async(x)=>{const d=await signUp(x.email,x.password),id=d.localId,photo=photoOf(x),r=normalizePhotoRecord(id,{id,name:x.name,role:x.role||"employee",baseSalary:Number(x.baseSalary)||0,paymentMethod:x.paymentMethod||"cash",networkAmount:Number(x.networkAmount)||0,branchId:x.branchId||"",permissions:x.permissions||null,active:true,email:x.email,photoData:photo||"",profilePhoto:photo||"",photo:photo||"",image:photo||"",avatar:photo||"",authUid:id});await fbPut(`employees/${id}`,r,session.idToken);await fbPut(`employeePhotos/${id}`,{photoData:photo||"",updatedAt:Date.now(),employeeId:id},session.idToken);setEmployees(e=>[...e,normalizeEmployee(id,r)])};const importPdf=async()=>{const branchByName=async n=>{let b=branches.find(b=>b.name===n)||branches.find(b=>b.name.includes(n))||branches.find(b=>n.includes(b.name));if(b)return b;const id="pdf-branch-"+n.replace(/\s+/g,"-");b={...DEFAULT_BRANCH,id,name:n,needsLocationSetup:true};await fbPut(`branches/${id}`,b,session.idToken);return b};let added=0;for(const x of PDF_EMPLOYEE_IMPORT){const exists=employees.find(e=>e.pdfNo===x.no&&e.sourcePdf==="Tal Albarka_August 2026.pdf")||employees.find(e=>e.name===x.name&&e.role!=="admin");if(exists)continue;const b=await branchByName(x.branch);const id="pdf-aug-2026-"+x.no;const r={id,name:x.name,role:"employee",baseSalary:Number(x.baseSalary),paymentMethod:x.bank>0?(x.cash>0?"split":"bank"):"cash",networkAmount:x.bank,branchId:b.id,active:true,email:"",phone:"",nationalId:"",jobTitle:"",hireDate:"",address:"",bankAccount:"",photoData:"",employeeCode:String(x.no),needsCompletion:true,sourcePdf:"Tal Albarka_August 2026.pdf",pdfNo:x.no,pdfBranch:x.branch,pdfCash:x.cash,pdfBank:x.bank,pdfOvertime:x.overtime,pdfBaseSalary:x.baseSalary,pdfAdvanceDeduction:x.advanceDeduction,pdfNet:x.net};await fbPut(`employees/${id}`,r,session.idToken);added++;}if(added){const es=await fbGet("employees",session.idToken),bs=await fbGet("branches",session.idToken);setEmployees(es?Object.entries(es).map(([id,v])=>normalizeEmployee(id,v)):[]);setBranches(bs?Object.entries(bs).map(([id,v])=>({...DEFAULT_BRANCH,...v,id,radiusMeters:Math.min(300,Number(v.radiusMeters)||300),requiredHours:8,graceMinutes:15})):[]);alert(`تم استيراد ${added} موظف من ملف PDF. يرجى استكمال البريد وكلمة المرور والصورة والبيانات الناقصة من خلال التعديل.`)}else alert("الموظفون الموجودون من ملف PDF سبق استيرادهم.")};
 const updateEmp=async(id,p)=>{const old=employees.find(x=>x.id===id);const photo=photoOf(p)||photoOf(old);const r=normalizePhotoRecord(id,{...p,authUid:p.authUid||old?.authUid||id,baseSalary:Number(p.baseSalary)||0,networkAmount:Number(p.networkAmount)||0});if(photo){r.photoData=photo;r.profilePhoto=photo;r.photo=photo;r.image=photo;r.avatar=photo;r.photoUpdatedAt=Date.now()}else{r.photoData="";r.profilePhoto="";r.photo="";r.image="";r.avatar=""}if(old&&old.branchId!==r.branchId){r.transferHistory=[...(old.transferHistory||[]),{fromBranchId:old.branchId||"",toBranchId:r.branchId||"",date:today(),by:profile?.name||"المشرف"}]};await fbPatch(`employees/${id}`,r,session.idToken);await fbPut(`employeePhotos/${id}`,{photoData:photo||"",updatedAt:Date.now()},session.idToken);if(old?.authUid&&String(old.authUid)!==String(id))await fbPut(`employeePhotos/${old.authUid}`,{photoData:photo||"",updatedAt:Date.now(),employeeId:id},session.idToken);setEmployees(e=>e.map(x=>x.id===id?normalizeEmployee(id,{...x,...r}):x));if(String(profile?.id)===String(id))setProfile(x=>({...x,...normalizeEmployee(id,{...x,...r}),photoData:photo||""}))};const saveEmployeePhoto=async(id,photo)=>{
   if(!photo){alert("لم يتم اختيار صورة.");return false;}
   try{
