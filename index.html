@@ -439,7 +439,7 @@ function Admin({profile,token,employees,branches,attendance,advances,leaves,loca
   const adminList=admins.map(e=>h("div",{key:e.id,className:"pill rounded-xl p-3 mb-2 flex justify-between gap-3"},[h("div",null,[h("div",{className:"font-bold"},e.name),h("div",{className:"muted text-xs"},"حساب مشرف • لا يمكن تعطيله نهائيًا")]),h(Badge,{tone:"green",children:"حساب إداري محمي"})]));
   const form=h(Card,null,[h("div",{className:"flex gap-2 mb-4"},[h(Btn,{kind:accountType==="employee"?"primary":"secondary",onClick:()=>setAccountType("employee"),children:"حساب موظف"}),h(Btn,{kind:accountType==="admin"?"primary":"secondary",onClick:()=>setAccountType("admin"),children:"حساب مشرف"})]),h("div",{className:"flex flex-wrap justify-between items-center gap-2 mb-3"},h("h3",{className:"font-black"},accountType==="employee"?"إضافة موظف":"إضافة مشرف"),accountType==="employee"&&h(Btn,{kind:"secondary",onClick:importPdf,children:"استيراد موظفي PDF أغسطس 2026"})),input("name","الاسم"),input("email","البريد الإلكتروني"),input("password","كلمة المرور","password"),accountType==="employee"&&h(React.Fragment,null,input("baseSalary","الراتب الأساسي الكامل","number"),h("select",{className:"field",value:newE.branchId,onChange:e=>setNewE({...newE,branchId:e.target.value})},branches.map(b=>h("option",{key:b.id,value:b.id},b.name))),h("select",{className:"field",value:newE.paymentMethod,onChange:e=>setNewE({...newE,paymentMethod:e.target.value})},[h("option",{value:"cash"},"نقدي فقط"),h("option",{value:"bank"},"شبكة فقط"),h("option",{value:"split"},"شبكة ثابتة + الباقي نقدي")]),newE.paymentMethod==="split"&&input("networkAmount","مبلغ الشبكة الثابت","number")),accountType==="employee"&&h(PhotoField,{value:newE.photoData||"",onChange:v=>setNewE({...newE,photoData:v})}),accountType==="admin"&&h("div",{className:"pill rounded-xl p-3 space-y-2"},[h("div",{className:"font-bold text-sm"},"صلاحيات المشرف"),ADMIN_PERMISSION_LIST.map(x=>h("label",{key:x[0],className:"flex items-center gap-2 text-sm"},h("input",{type:"checkbox",checked:!!adminPerms[x[0]],onChange:e=>setAdminPerms({...adminPerms,[x[0]]:e.target.checked})}),x[1]))]),h(Btn,{onClick:save,children:accountType==="employee"?"إنشاء الموظف":"إنشاء المشرف"})]);
   const listControls=h("div",{className:"flex flex-wrap items-center justify-between gap-2 mb-3"},[
-    h("h3",{className:"font-black"},"الموظفون النشطون"),
+    h("h3",{className:"font-black"},`الموظفون النشطون (${active.length})`),
     h("div",{className:"flex gap-2 flex-wrap"},[
       h("select",{className:"field w-auto",value:sortMode,onChange:e=>setSortMode(e.target.value)},[h("option",{value:"name"},"ترتيب بالاسم"),h("option",{value:"branch"},"ترتيب حسب الفرع"),h("option",{value:"salary"},"الأعلى راتبًا")]),
       h("select",{className:"field w-auto",value:branchFilter,onChange:e=>setBranchFilter(e.target.value)},[h("option",{value:"all"},"كل الفروع"),...branches.map(b=>h("option",{key:b.id,value:b.id},b.name))])
@@ -571,8 +571,28 @@ const load=useCallback(async(s)=>{
   const bs=core[1].status==="fulfilled"?core[1].value:null;
   if(isAdmin){
     const ids=es?Object.keys(es):[];
-    const detail=await Promise.allSettled(ids.map(id=>fbGet(`employees/${encodeURIComponent(id)}`,t)));
-    setEmployees(ids.map((id,i)=>detail[i].status==="fulfilled"&&detail[i].value?normalizeEmployee(id,detail[i].value):normalizeEmployee(id,es[id]||{})));
+    // لا ننتظر تحميل كل ملفات الموظفين قبل عرض صفحة المشرف.
+    // هذا يمنع صور/بيانات الموظفين الكبيرة من تعطيل الواجهة.
+    setEmployees(ids.map(id=>normalizeEmployee(id,{id,active:true,name:"جارٍ التحميل…",role:"employee"})));
+    const hydrate=async()=>{
+      const out=[];
+      for(let i=0;i<ids.length;i+=4){
+        const batch=ids.slice(i,i+4);
+        const rs=await Promise.allSettled(batch.map(id=>fbGet(`employees/${encodeURIComponent(id)}`,t)));
+        rs.forEach((r,j)=>{
+          const id=batch[j];
+          if(r.status==="fulfilled"&&r.value) out.push(normalizeEmployee(id,r.value));
+          else out.push(normalizeEmployee(id,es[id]||{}));
+        });
+        setEmployees(prev=>{
+          const map=new Map(prev.map(x=>[String(x.id),x]));
+          out.slice(-batch.length).forEach(x=>map.set(String(x.id),x));
+          return ids.map(id=>map.get(String(id))||normalizeEmployee(id,es[id]||{}));
+        });
+        await new Promise(r=>setTimeout(r,0));
+      }
+    };
+    hydrate().catch(()=>{});
   }else if(es)setEmployees([normalizeEmployee(s.uid,es)]);
   setBranches(bs?Object.entries(bs).map(([id,v])=>({...DEFAULT_BRANCH,...v,id,radiusMeters:Math.max(10,Number(v.radiusMeters)||300),requiredHours:8,graceMinutes:15})):[]);
   if(s?.uid){
