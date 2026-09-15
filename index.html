@@ -382,8 +382,7 @@ function AdvanceManager({items,employees,onUpdate}){
  return h(Card,null,[h("div",{className:"flex flex-wrap justify-between gap-3 mb-4"},h("div",null,h("h3",{className:"font-black text-xl"},"إدارة السلف والتحكم الكامل"),h("div",{className:"muted text-xs mt-1"},"إعادة تقسيم الأقساط أو تسجيل دفعة أو إيقاف السلفة")),h("select",{className:"field w-auto",value:filter,onChange:e=>setFilter(e.target.value)},h("option",{value:"all"},"كل الحالات"),h("option",{value:"pending"},"قيد المراجعة"),h("option",{value:"approved"},"نشطة"),h("option",{value:"rejected"},"مرفوضة"),h("option",{value:"closed"},"مغلقة"))),h("div",{className:"space-y-2"},rows.length?rows.map(a=>h("div",{key:`${a.employeeId}-${a.id}`,className:"pill rounded-2xl p-4"},h("div",{className:"flex flex-wrap justify-between gap-3"},h("div",null,h("div",{className:"font-bold"},emp(a)?.name||a.employeeId),h("div",{className:"text-sm muted mt-1"},`السلفة: ${money(a.amount)} • المتبقي: ${money(a.remainingBalance)}`),h("div",{className:"text-xs muted mt-1"},`الأقساط: ${a.installmentsCount||0} • القسط الحالي: ${money(a.installmentAmount||0)} • المتبقي: ${a.remainingInstallments||0}`)),h("div",{className:"flex gap-2 flex-wrap"},h(Btn,{kind:"secondary",onClick:()=>setEditing(a),children:"إعادة تقسيم"}),a.status==="approved"&&h(Btn,{kind:"secondary",onClick:()=>onUpdate(a,{action:"pay",amount:Number(a.installmentAmount)||0}),children:"تسجيل قسط"}),a.status==="approved"&&h(Btn,{kind:"danger",onClick:()=>onUpdate(a,{action:"close"}),children:"إغلاق السلفة"}))),editing&&editing.id===a.id&&h("div",{className:"grid sm:grid-cols-3 gap-2 mt-3"},h("input",{className:"field",type:"number",min:1,placeholder:"عدد الأقساط الجديدة",defaultValue:a.remainingInstallments||a.installmentsCount||1,id:`inst-${a.id}`}),h("input",{className:"field",type:"number",min:0,placeholder:"المتبقي الجديد",defaultValue:a.remainingBalance||0,id:`bal-${a.id}`}),h("div",{className:"flex gap-2"},h(Btn,{onClick:()=>{const n=Math.max(1,Number(document.getElementById(`inst-${a.id}`).value)||1),bal=Math.max(0,Number(document.getElementById(`bal-${a.id}`).value)||0);onUpdate(a,{action:"resplit",installments:n,remainingBalance:bal});setEditing(null)},children:"حفظ التقسيم"}),h(Btn,{kind:"secondary",onClick:()=>setEditing(null),children:"إلغاء"}))))):h("div",{className:"muted"},"لا توجد سلف بهذه الحالة"))]);
 }
 function Admin({profile,employees,branches,attendance,advances,leaves,locationIncidents,notifications,onNotificationOpen,onLogout,onAddEmployee,onUpdateEmployee,onDeactivate,onSaveBranch,onAddBranch,onDeleteBranch,onDecision,onLeaveDecision,onUpdateAttendance,onImportPdf,onRepairPhotos,onRepairAttendance,onRepairPayroll,onManageAdvance,onRestoreEmployee,onCleanupEmployeeData}){
- const [tab,setTab]=useState("home"),[month,setMonth]=useState(monthKey(today())),[newE,setNewE]=useState({name:"",email:"",password:"",baseSalary:"",paymentMethod:"cash",networkAmount:"",branchId:branches[0]?.id||"",photoData:""}),[newB,setNewB]=useState(""),[edit,setEdit]=useState(null),[accountType,setAccountType]=useState("employee"),[adminPerms,setAdminPerms]=useState(Object.fromEntries(ADMIN_PERMISSION_LIST.map(x=>[x[0],true]))),[payrollTick,setPayrollTick]=useState(0),[sortMode,setSortMode]=useState("name"),[branchFilter,setBranchFilter]=useState("all");
- useEffect(()=>{const id=setInterval(()=>{setPayrollTick(x=>x+1);setMonth(m=>m===monthKey(today())?m:monthKey(today()))},1000);return()=>clearInterval(id)},[]);
+ const [tab,setTab]=useState("home"),[month,setMonth]=useState(monthKey(today())),[newE,setNewE]=useState({name:"",email:"",password:"",baseSalary:"",paymentMethod:"cash",networkAmount:"",branchId:branches[0]?.id||"",photoData:""}),[newB,setNewB]=useState(""),[edit,setEdit]=useState(null),[accountType,setAccountType]=useState("employee"),[adminPerms,setAdminPerms]=useState(Object.fromEntries(ADMIN_PERMISSION_LIST.map(x=>[x[0],true]))),[sortMode,setSortMode]=useState("name"),[branchFilter,setBranchFilter]=useState("all");
  const importPdf=()=>onImportPdf();
  const active=employeeSort(employees,sortMode,branchFilter);
  const archived=employees.filter(e=>e.role!=="admin"&&e.active===false);
@@ -396,7 +395,7 @@ function Admin({profile,employees,branches,attendance,advances,leaves,locationIn
   const byDay=new Map(); raw.forEach(a=>{const d=recordDate(a),key=`${e.id}|${d}`;const prev=byDay.get(key);if(!prev){byDay.set(key,a);return;}const score=x=>(x.checkOutTime?8:0)+(x.checkInTime?4:0)+(toNum(x.workHours)>0?2:0)+(toNum(x.overtimeHours)>0?1:0);if(score(a)>score(prev))byDay.set(key,a);});
   const rs=[...byDay.values()]; const records=rs.map(a=>({...a,branch:recordBranch(a,e,branches)})); const calc=payrollFor(e,records,advances,month);
   return {...calc,e,present:rs.filter(a=>(a.checkInTime||a.checkIn||a.inTime||a.clockIn||toNum(a.workHours)>0)).length,records};
-}),[active,attendance,branches,advances,month,payrollTick]);
+}),[active,attendance,branches,advances,month]);
  const pendingSettlements=advances.filter(a=>a.settlementRequest?.status==="pending");
  useEffect(()=>{
   const fn=e=>{const d=e.detail||{};if(d.target)setTab(d.target);if(d.requestId)setTimeout(()=>{const kind=d.target==="leaves"?"leave":"advance";const el=document.getElementById(`request-${kind}-${d.requestId}`);if(el){el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("ring-2","ring-cyan-400");setTimeout(()=>el.classList.remove("ring-2","ring-cyan-400"),1800)}},150)};
@@ -504,16 +503,16 @@ function startFirebaseStream(path,token,onChange){
 }
 function App(){const[session,setSession]=useState(null),[profile,setProfile]=useState(null),[employees,setEmployees]=useState([]),[branches,setBranches]=useState([]),[attendance,setAttendance]=useState([]),[advances,setAdvances]=useState([]),[leaves,setLeaves]=useState([]),[locationIncidents,setLocationIncidents]=useState([]),[notifications,setNotifications]=useState([]),[loading,setLoading]=useState(true);const load=useCallback(async(s)=>{
   const t=tokenOf(s);
-  const settled=await Promise.allSettled([fbGet("employees",t),fbGet("branches",t),fbGet("attendance",t),fbGet("advances",t),fbGet("leaves",t),fbGet("locationIncidents",t).catch(()=>null)]); const [es,bs,as,avs,ls,lis]=settled.map(x=>x.status==="fulfilled"?x.value:null);
-  // لا نحمّل مخزن الصور الكامل أثناء الدخول؛ الصور الكبيرة كانت سببًا رئيسيًا في بطء الشاشة.
-  // يتم تحميل بيانات الموظفين الأساسية أولاً، والصور الإضافية في الخلفية عند الحاجة.
+  // تحميل البيانات الأساسية أولًا حتى تظهر لوحة المشرف بسرعة.
+  const core=await Promise.allSettled([fbGet("employees",t),fbGet("branches",t)]);
+  const es=core[0].status==="fulfilled"?core[0].value:null;
+  const bs=core[1].status==="fulfilled"?core[1].value:null;
   const enrichedEmployees=es?Object.entries(es).map(([id,v])=>{
     const photo=photoOf(v);
     return normalizeEmployee(id,photo?{...v,photoData:photo,profilePhoto:photo,photo,image:photo,avatar:photo}:v);
   }):[];
   setEmployees(enrichedEmployees);
   setBranches(bs?Object.entries(bs).map(([id,v])=>({...DEFAULT_BRANCH,...v,id,radiusMeters:Math.max(10,Number(v.radiusMeters)||300),requiredHours:8,graceMinutes:15})):[]);
-  setAttendance(flatten(as)); setAdvances(flatten(avs)); setLeaves(flatten(ls)); setLocationIncidents(flatten(lis));
   let resolved=null;
   if(s?.uid){
     resolved=await resolveEmployeeForAuth(s.uid,s.email||"",t).catch(()=>null);
@@ -528,6 +527,20 @@ function App(){const[session,setSession]=useState(null),[profile,setProfile]=use
     merged.forEach(n=>unique.set(String(n.id||`${n.createdAt||0}-${n.title||""}-${n.message||""}`),n));
     setNotifications([...unique.values()].sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0)));
   }catch(e){setNotifications([])}
+},[]);
+const loadHeavy=useCallback(async(s)=>{
+  const t=tokenOf(s);
+  const settled=await Promise.allSettled([
+    fbGet("attendance",t),
+    fbGet("advances",t),
+    fbGet("leaves",t),
+    fbGet("locationIncidents",t).catch(()=>null)
+  ]);
+  const [as,avs,ls,lis]=settled.map(x=>x.status==="fulfilled"?x.value:null);
+  setAttendance(flatten(as));
+  setAdvances(flatten(avs));
+  setLeaves(flatten(ls));
+  setLocationIncidents(flatten(lis));
 },[]);
 const openNotification=async(n)=>{
  if(!n)return;
@@ -558,11 +571,11 @@ useEffect(()=>{(async()=>{
   }catch(e){}
   setLoading(false);
 })()},[load]);
-useEffect(()=>{if(!session)return;let busy=false;const refreshData=async()=>{if(busy)return;busy=true;try{await load(session)}catch(e){if(e?.message==="AUTH_EXPIRED"&&session.refreshToken){try{const r=await refresh(session.refreshToken);const ns={...session,idToken:r.idToken,refreshToken:r.refreshToken};setSession(ns);localStorage.setItem("tal_session",JSON.stringify({refreshToken:r.refreshToken,email:session.email||""}));await load(ns)}catch(_){}}}finally{busy=false}};refreshData();const id=setInterval(refreshData,15000);const vis=()=>{if(document.visibilityState==="visible")refreshData()};document.addEventListener("visibilitychange",vis);return()=>{clearInterval(id);document.removeEventListener("visibilitychange",vis)}},[session,load]);
+useEffect(()=>{if(!session)return;let busy=false;const refreshData=async()=>{if(busy)return;busy=true;try{await load(session);await loadHeavy(session)}catch(e){if(e?.message==="AUTH_EXPIRED"&&session.refreshToken){try{const r=await refresh(session.refreshToken);const ns={...session,idToken:r.idToken,refreshToken:r.refreshToken};setSession(ns);localStorage.setItem("tal_session",JSON.stringify({refreshToken:r.refreshToken,email:session.email||""}));await load(ns);await loadHeavy(ns)}catch(_){}}}finally{busy=false}};refreshData();const id=setInterval(refreshData,30000);const vis=()=>{if(document.visibilityState==="visible")refreshData()};document.addEventListener("visibilitychange",vis);return()=>{clearInterval(id);document.removeEventListener("visibilitychange",vis)}},[session,load,loadHeavy]);
 useEffect(()=>{if(!session)return;let timer=null;const trigger=()=>{clearTimeout(timer);timer=setTimeout(()=>load(session).catch(()=>{}),100)};const notificationPaths=[`notifications/${encodeURIComponent(session.uid)}`];
 const pkey=profile?.id;
 if(pkey && String(pkey)!==String(session.uid)) notificationPaths.push(`notifications/${encodeURIComponent(pkey)}`);
-const stops=["attendance","employees","employeePhotos","locationIncidents",...notificationPaths].map(path=>startFirebaseStream(path,session.idToken,trigger));return()=>{clearTimeout(timer);stops.forEach(fn=>fn&&fn())}},[session,load]);
+const stops=["employees",...notificationPaths].map(path=>startFirebaseStream(path,session.idToken,trigger));return()=>{clearTimeout(timer);stops.forEach(fn=>fn&&fn())}},[session,load]);
 useEffect(()=>{if(!session?.uid)return;const e=employees.find(x=>String(x.id)===String(session.uid)||String(x.authUid||"")===String(session.uid)||(session.email&&String(x.email||"").toLowerCase()===String(session.email||"").toLowerCase()));if(e)setProfile(p=>({...p,...e,authUid:session.uid,photoData:photoOf(e)||photoOf(p)||""}))},[employees,session?.uid]);
 const logout=()=>{setSession(null);setProfile(null);localStorage.removeItem("tal_session")};const branch=branches.find(b=>b.id===profile?.branchId)||branches[0]||DEFAULT_BRANCH;const addAttendance=async({type,selfie,distance,lat,lng,securityEvent,securityReason,accuracy,locationTimestamp})=>{
  const date=today(),stamp=now(),activeBranch=branches.find(b=>b.id===profile?.branchId)||branch;
