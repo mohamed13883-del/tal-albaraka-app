@@ -162,9 +162,15 @@ function flatten(obj) {
       // Support both attendance/{employee}/{date} and attendance/{date}/{employee} layouts.
       const nextOwner=full ? (looksLikeEmployeeKey(Object.keys(v)[0]||"") ? ownerId : ownerId) : (ownerId||(!mon&&!day?k:""));
       if(full){
-        Object.entries(v).forEach(([childKey,childVal])=>{
-          if(childVal&&typeof childVal==="object") walk(childVal,looksLikeEmployeeKey(childKey)?childKey:ownerId,nextDate,nextMonth);
-        });
+        // Important: support attendance/{employee}/{YYYY-MM-DD} where the date node
+        // itself is the attendance record (not another wrapper object).
+        if(isRec(v)){
+          walk(v,ownerId,nextDate,nextMonth);
+        }else{
+          Object.entries(v).forEach(([childKey,childVal])=>{
+            if(childVal&&typeof childVal==="object") walk(childVal,looksLikeEmployeeKey(childKey)?childKey:ownerId,nextDate,nextMonth);
+          });
+        }
       }else walk(v,nextOwner,nextDate,nextMonth);
     });
   };
