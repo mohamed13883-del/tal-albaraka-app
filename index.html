@@ -385,15 +385,13 @@ const load=useCallback(async(s)=>{
   const t=tokenOf(s);
   const isAdmin=s?.role==="admin";
   const core=await Promise.allSettled([
-    isAdmin?fbGetShallow("employees",t):fbGet(`employees/${encodeURIComponent(s?.uid||"")}`,t),
+    isAdmin?fbGet("employees",t):fbGet(`employees/${encodeURIComponent(s?.uid||"")}`,t),
     fbGet("branches",t)
   ]);
   const es=core[0].status==="fulfilled"?core[0].value:null;
   const bs=core[1].status==="fulfilled"?core[1].value:null;
   if(isAdmin){
-    const ids=es?Object.keys(es):[];
-    const detail=await Promise.allSettled(ids.map(id=>fbGet(`employees/${encodeURIComponent(id)}`,t)));
-    setEmployees(ids.map((id,i)=>detail[i].status==="fulfilled"&&detail[i].value?normalizeEmployee(id,detail[i].value):normalizeEmployee(id,es[id]||{})));
+    setEmployees(es?Object.entries(es).map(([id,v])=>normalizeEmployee(id,v)):[]);
   }else if(es)setEmployees([normalizeEmployee(s.uid,es)]);
   setBranches(bs?Object.entries(bs).map(([id,v])=>({...DEFAULT_BRANCH,...v,id,radiusMeters:Math.max(10,Number(v.radiusMeters)||300),requiredHours:8,graceMinutes:15})):[]);
   if(s?.uid){
