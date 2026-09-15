@@ -59,7 +59,35 @@ table{border-spacing:0 6px}th{color:#82a9c0!important;text-transform:none}td{bac
 .gps-status{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:13px;background:rgba(34,229,138,.08);border:1px solid rgba(34,229,138,.18);color:#9affc8;font-size:12px}.gps-status.out{background:rgba(255,70,103,.08);border-color:rgba(255,70,103,.18);color:#ff9eb0}
 .pro-header{position:relative}.pro-header:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(25,200,255,.07),transparent);pointer-events:none}
 @media(max-width:900px){.page-shell{padding:10px}.app-layout{grid-template-columns:1fr}.side-nav{position:sticky;top:6px;z-index:20}.gps-ring{width:150px;height:150px}}
-</style></head><body><div id="root"></div><script id="src">
+</style></head><body><div id="root"></div>
+<script>
+(function(){
+  function showErr(msg){
+    var el=document.getElementById('err-overlay');
+    if(!el){
+      el=document.createElement('div');
+      el.id='err-overlay';
+      el.style.cssText='position:fixed;inset:0;background:#1a1a1a;color:#fff;z-index:999999;direction:rtl;text-align:right;font-family:sans-serif;padding:16px;overflow:auto;white-space:pre-wrap;font-size:14px;line-height:1.6';
+      document.body.appendChild(el);
+      var title=document.createElement('div');
+      title.textContent='حصل خطأ برمجي منع تحميل الصفحة:';
+      title.style.cssText='font-weight:bold;font-size:18px;margin-bottom:12px;color:#ff6b6b';
+      el.appendChild(title);
+    }
+    var line=document.createElement('div');
+    line.style.cssText='margin-top:8px;padding:8px;background:#2a2a2a;border-radius:6px;direction:ltr;text-align:left';
+    line.textContent=msg;
+    el.appendChild(line);
+  }
+  window.addEventListener('error',function(e){
+    showErr((e.message||'خطأ غير معروف')+' | '+(e.filename||'')+':'+(e.lineno||'')+':'+(e.colno||''));
+  });
+  window.addEventListener('unhandledrejection',function(e){
+    showErr('Promise rejection: '+(e.reason && (e.reason.stack||e.reason.message||e.reason)));
+  });
+})();
+</script>
+<script id="src">
 
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
