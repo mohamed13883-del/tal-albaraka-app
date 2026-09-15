@@ -388,7 +388,7 @@ function AdvanceManager({items,employees,onUpdate}){
  const emp=a=>employees.find(e=>employeeMatchesRecord(e,a));
  return h(Card,null,[h("div",{className:"flex flex-wrap justify-between gap-3 mb-4"},h("div",null,h("h3",{className:"font-black text-xl"},"إدارة السلف والتحكم الكامل"),h("div",{className:"muted text-xs mt-1"},"إعادة تقسيم الأقساط أو تسجيل دفعة أو إيقاف السلفة")),h("select",{className:"field w-auto",value:filter,onChange:e=>setFilter(e.target.value)},h("option",{value:"all"},"كل الحالات"),h("option",{value:"pending"},"قيد المراجعة"),h("option",{value:"approved"},"نشطة"),h("option",{value:"rejected"},"مرفوضة"),h("option",{value:"closed"},"مغلقة"))),h("div",{className:"space-y-2"},rows.length?rows.map(a=>h("div",{key:`${a.employeeId}-${a.id}`,className:"pill rounded-2xl p-4"},h("div",{className:"flex flex-wrap justify-between gap-3"},h("div",null,h("div",{className:"font-bold"},emp(a)?.name||a.employeeId),h("div",{className:"text-sm muted mt-1"},`السلفة: ${money(a.amount)} • المتبقي: ${money(a.remainingBalance)}`),h("div",{className:"text-xs muted mt-1"},`الأقساط: ${a.installmentsCount||0} • القسط الحالي: ${money(a.installmentAmount||0)} • المتبقي: ${a.remainingInstallments||0}`)),h("div",{className:"flex gap-2 flex-wrap"},h(Btn,{kind:"secondary",onClick:()=>setEditing(a),children:"إعادة تقسيم"}),a.status==="approved"&&h(Btn,{kind:"secondary",onClick:()=>onUpdate(a,{action:"pay",amount:Number(a.installmentAmount)||0}),children:"تسجيل قسط"}),a.status==="approved"&&h(Btn,{kind:"danger",onClick:()=>onUpdate(a,{action:"close"}),children:"إغلاق السلفة"}))),editing&&editing.id===a.id&&h("div",{className:"grid sm:grid-cols-3 gap-2 mt-3"},h("input",{className:"field",type:"number",min:1,placeholder:"عدد الأقساط الجديدة",defaultValue:a.remainingInstallments||a.installmentsCount||1,id:`inst-${a.id}`}),h("input",{className:"field",type:"number",min:0,placeholder:"المتبقي الجديد",defaultValue:a.remainingBalance||0,id:`bal-${a.id}`}),h("div",{className:"flex gap-2"},h(Btn,{onClick:()=>{const n=Math.max(1,Number(document.getElementById(`inst-${a.id}`).value)||1),bal=Math.max(0,Number(document.getElementById(`bal-${a.id}`).value)||0);onUpdate(a,{action:"resplit",installments:n,remainingBalance:bal});setEditing(null)},children:"حفظ التقسيم"}),h(Btn,{kind:"secondary",onClick:()=>setEditing(null),children:"إلغاء"}))))):h("div",{className:"muted"},"لا توجد سلف بهذه الحالة"))]);
 }
-function Admin({profile,token,employees,branches,attendance,advances,leaves,locationIncidents,notifications,onNotificationOpen,onLogout,onAddEmployee,onUpdateEmployee,onDeactivate,onSaveBranch,onAddBranch,onDeleteBranch,onDecision,onLeaveDecision,onUpdateAttendance,onImportPdf,onRepairPhotos,onRepairAttendance,onRepairPayroll,onManageAdvance,onRestoreEmployee,onCleanupEmployeeData,onMigratePhotos}){
+function Admin({profile,token,employees,branches,attendance,advances,leaves,locationIncidents,notifications,onNotificationOpen,onLogout,onAddEmployee,onUpdateEmployee,onDeactivate,onSaveBranch,onAddBranch,onDeleteBranch,onDecision,onLeaveDecision,onUpdateAttendance,onImportPdf,onRepairPhotos,onRepairAttendance,onRepairPayroll,onManageAdvance,onRestoreEmployee,onCleanupEmployeeData,onMigratePhotos,onLoadSection}){
  const [tab,setTab]=useState("home"),[month,setMonth]=useState(monthKey(today())),[newE,setNewE]=useState({name:"",email:"",password:"",baseSalary:"",paymentMethod:"cash",networkAmount:"",branchId:branches[0]?.id||"",photoData:""}),[newB,setNewB]=useState(""),[edit,setEdit]=useState(null),[accountType,setAccountType]=useState("employee"),[adminPerms,setAdminPerms]=useState(Object.fromEntries(ADMIN_PERMISSION_LIST.map(x=>[x[0],true]))),[sortMode,setSortMode]=useState("name"),[branchFilter,setBranchFilter]=useState("all");
  const importPdf=()=>onImportPdf();
  const active=employeeSort(employees,sortMode,branchFilter);
@@ -411,6 +411,7 @@ function Admin({profile,token,employees,branches,attendance,advances,leaves,loca
   const fn=e=>{const d=e.detail||{};if(d.target)setTab(d.target);if(d.requestId)setTimeout(()=>{const kind=d.target==="leaves"?"leave":"advance";const el=document.getElementById(`request-${kind}-${d.requestId}`);if(el){el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("ring-2","ring-cyan-400");setTimeout(()=>el.classList.remove("ring-2","ring-cyan-400"),1800)}},150)};
   window.addEventListener("tal-notification-open",fn);return()=>window.removeEventListener("tal-notification-open",fn);
  },[]);
+ useEffect(()=>{if(onLoadSection)onLoadSection(tab).catch(()=>{});},[tab,onLoadSection]);
  const exportX=()=>{const rows=report.map(r=>({"الموظف":r.e.name||"","الراتب الأساسي":Number(r.baseSalary.toFixed(2)),"المستحق الأساسي حتى الآن":Number(r.earnedBasic.toFixed(2)),"أيام الحضور":r.present,"ساعات العمل":Number(r.regular.toFixed(2)),"الساعات الإضافية":Number(r.ot.toFixed(2)),"قيمة الإضافي":Number(r.overtimeValue.toFixed(2)),"إجمالي المستحق":Number(r.gross.toFixed(2)),"الخصومات":Number(r.deductions.toFixed(2)),"صافي الراتب":Number(r.net.toFixed(2)),"نقدي":Number(r.cash.toFixed(2)),"شبكة":Number(r.network.toFixed(2))}));const ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Payroll");XLSX.writeFile(wb,`Payroll-${month}.xlsx`)};const exportPDF=()=>{const w=window.open("","_blank");if(!w){alert("اسمح بفتح النوافذ المنبثقة لاستخراج PDF");return}const rows=report.map(r=>`<tr><td>${r.e.name||""}</td><td>${money(r.baseSalary)}</td><td>${money(r.earnedBasic)}</td><td>${r.present}</td><td>${r.regular.toFixed(2)}</td><td>${r.ot.toFixed(2)}</td><td>${money(r.overtimeValue)}</td><td>${money(r.gross)}</td><td>${money(r.deductions)}</td><td><b>${money(r.net)}</b></td><td>${money(r.network)}</td><td>${money(r.cash)}</td></tr>`).join("");w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير رواتب ${month}</title><style>@page{size:A4 landscape;margin:12mm}body{font-family:Arial,Tahoma,sans-serif;color:#102a43;margin:0}header{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #0ea5e9;padding-bottom:12px;margin-bottom:16px}h1{margin:0;font-size:25px}p{margin:4px 0;color:#52606d}.badge{font-size:12px;background:#e0f2fe;padding:8px 12px;border-radius:10px}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#0f4c5c;color:#fff;padding:8px}td{border:1px solid #d9e2ec;padding:7px;text-align:center}tbody tr:nth-child(even){background:#f7fafc}.net{font-weight:800}.footer{margin-top:14px;font-size:10px;color:#627d98;display:flex;justify-content:space-between}</style></head><body><header><div><h1>تال البركة — تقرير الرواتب</h1><p>الشهر: ${month} • يوم صرف الراتب: 27</p></div><div class="badge">الراتب الأساسي • المستحق حتى الآن • الإضافي • الخصومات • صافي الراتب</div></header><table><thead><tr><th>الموظف</th><th>الراتب الأساسي</th><th>المستحق حتى الآن</th><th>أيام الحضور</th><th>ساعات العمل</th><th>الإضافي</th><th>قيمة الإضافي</th><th>إجمالي المستحق</th><th>الخصومات</th><th>صافي الراتب</th><th>شبكة</th><th>نقدي</th></tr></thead><tbody>${rows}</tbody></table><div class="footer"><span>تم إنشاء التقرير من بيانات الحضور والانصراف المسجلة بالنظام.</span><span>${new Date().toLocaleString("ar-SA")}</span></div><${"scr"}ipt>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/${"scr"}ipt></body></html>`);w.document.close()};
  const input=(key,ph,type="text")=>h("input",{className:"field",placeholder:ph,type,value:newE[key],onChange:e=>setNewE({...newE,[key]:e.target.value})});
  let content=null;
@@ -467,21 +468,21 @@ function Admin({profile,token,employees,branches,attendance,advances,leaves,loca
 async function resolveEmployeeForAuth(uid,email,token){
   const em=String(email||"").trim().toLowerCase();
   const candidates=[];
-  // أهم مسار: ملف الموظف يحمل نفس UID، فلا نحمّل شجرة الموظفين كاملة.
-  try{const direct=await fbGet(`employees/${encodeURIComponent(uid)}`,token);if(direct)candidates.push([uid,direct,10]);}catch(e){}
-  if(!candidates.length){
-    try{
-      const es=await fbGet("employees",token);
-      if(es){
-        Object.entries(es).forEach(([id,v])=>{
-          if(String(v?.authUid||"")===String(uid))candidates.push([id,v,14]);
-          else if(em && String(v?.email||"").trim().toLowerCase()===em)candidates.push([id,v,13]);
-        });
-      }
-    }catch(e){}
-  }
+  // أولوية ثابتة: UID ثم authUid ثم البريد. لا نعتبر active=false سببًا لاختيار السجل الخطأ.
+  try{const direct=await fbGet(`employees/${encodeURIComponent(uid)}`,token);if(direct)candidates.push([uid,direct,100]);}catch(e){}
+  try{
+    const es=await fbGet("employees",token);
+    if(es){
+      Object.entries(es).forEach(([id,v])=>{
+        const sameUid=String(v?.authUid||"")===String(uid);
+        const sameEmail=!!em && String(v?.email||"").trim().toLowerCase()===em;
+        if(id!==String(uid)&&sameUid)candidates.push([id,v,90]);
+        else if(id!==String(uid)&&sameEmail)candidates.push([id,v,80]);
+      });
+    }
+  }catch(e){}
   if(!candidates.length)return null;
-  let best=null,bestScore=-1;
+  let best=null,bestScore=-Infinity;
   for(const [id,v,base] of candidates){
     let photo=photoOf(v);
     if(!photo && !toNum(v?.photoRemovedAt)){
@@ -489,12 +490,18 @@ async function resolveEmployeeForAuth(uid,email,token){
         try{const one=await fbGet(`employeePhotos/${encodeURIComponent(key)}`,token);photo=photoOf(one);if(photo)break;}catch(e){}
       }
     }
-    const score=base+(photo?20:0)+(v?.name?2:0)+(v?.email?2:0);
-    if(score>bestScore){bestScore=score;best={id,v,photo};}
+    // الحساب الإداري لا يدخل في حالة الأرشيف؛ الموظف العادي يظل خاضعًا لـ active.
+    const role=String(v?.role||"employee").toLowerCase();
+    const isAdmin=role==="admin"||role==="supervisor"||role==="manager";
+    const score=base+(isAdmin?30:0)+(v?.active!==false?10:-10)+(photo?2:0)+(v?.name?2:0)+(v?.email?1:0);
+    if(score>bestScore){bestScore=score;best={id,v,photo,isAdmin};}
   }
   if(!best)return null;
   const merged=best.photo?{...best.v,photoData:best.photo,profilePhoto:best.photo,photo:best.photo,image:best.photo,avatar:best.photo}:best.v;
-  return {...normalizeEmployee(best.id,merged),authUid:uid};
+  const result={...normalizeEmployee(best.id,merged),authUid:uid};
+  // المشرف حساب إداري ولا ينبغي أن يعلق بسبب علامة أرشيف قديمة. لا نحذف سجل الأرشيف.
+  if(best.isAdmin && result.active===false)result.active=true;
+  return result;
 }
 
 async function repairEmployeePhotoRecord(id,raw,token,photoStore){
@@ -565,35 +572,38 @@ const load=useCallback(async(s)=>{
   }
   await loadNotifications(s);
 },[loadNotifications]);
-const loadHeavy=useCallback(async(s)=>{
+const loadHeavy=useCallback(async(s,section="all")=>{
   const t=tokenOf(s);
   const isAdmin=s?.role==="admin";
-  const uidKey=encodeURIComponent(s?.uid||"");
   const empKeys=[s?.uid,profile?.id].filter((v,i,a)=>v&&a.indexOf(v)===i).map(encodeURIComponent);
   if(isAdmin){
-    const settled=await Promise.allSettled([fbGet("attendance",t),fbGet("advances",t),fbGet("leaves",t),fbGet("locationIncidents",t)]);
-    const [as,avs,ls,lis]=settled.map(x=>x.status==="fulfilled"?x.value:null);
-    setAttendance(flatten(as)); setAdvances(flatten(avs)); setLeaves(flatten(ls)); setLocationIncidents(flatten(lis));
-  }else{
-    // الموظف قد تكون سجلاته القديمة تحت employee id، بينما التحضير الجديد تحت auth UID.
-    // اقرأ الاثنين وادمجهما بدل استبدال الحالة بسجل فارغ عند التحديث.
-    const keys=[...new Set(empKeys)];
-    const attReads=await Promise.allSettled(keys.map(k=>fbGet(`attendance/${k}`,t)));
-    const advReads=await Promise.allSettled(keys.map(k=>fbGet(`advances/${k}`,t)));
-    const leaveReads=await Promise.allSettled(keys.map(k=>fbGet(`leaves/${k}`,t)));
-    const as=attReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
-    const avs=advReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
-    const ls=leaveReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
-    const dedupe=(arr,keyFn)=>{const m=new Map();arr.forEach(x=>m.set(keyFn(x),x));return [...m.values()]};
-    const att=dedupe(as,x=>[x.employeeId||x.authUid||s.uid,recordDate(x),x.checkInTime||x.checkIn||x.inTime||x.clockIn||"",x.checkOutTime||x.checkOut||x.outTime||x.clockOut||""].join("|"));
-    const adv=dedupe(avs,x=>String(x.id||`${x.requestDate||x.date||""}-${x.amount||0}`));
-    const lev=dedupe(ls,x=>String(x.id||`${x.start||x.startDate||""}-${x.end||x.endDate||""}`));
-    setAttendance(prev=>dedupe([...prev,...att],x=>[x.employeeId||x.authUid||s.uid,recordDate(x),x.checkInTime||x.checkIn||x.inTime||x.clockIn||"",x.checkOutTime||x.checkOut||x.outTime||x.clockOut||""].join("|")));
-    setAdvances(prev=>dedupe([...prev,...adv],x=>String(x.id||`${x.requestDate||x.date||""}-${x.amount||0}`)));
-    setLeaves(prev=>dedupe([...prev,...lev],x=>String(x.id||`${x.start||x.startDate||""}-${x.end||x.endDate||""}`)));
-    setLocationIncidents([]);
+    // المشرف لا يحمّل كل البيانات الثقيلة عند تسجيل الدخول. يتم تحميل كل قسم عند فتحه فقط.
+    const want=new Set(section==="all"?["attendance","advances","leaves","locationIncidents"]:section==="home"?["attendance","advances","locationIncidents"]:section==="reports"?["attendance","advances"]:section==="attendance"?["attendance"]:section==="advances"?["advances"]:section==="leaves"?["leaves"]:[]);
+    const jobs=[];
+    if(want.has("attendance"))jobs.push(fbGet("attendance",t).then(v=>setAttendance(flatten(v))).catch(e=>{throw e}));
+    if(want.has("advances"))jobs.push(fbGet("advances",t).then(v=>setAdvances(flatten(v))).catch(e=>{throw e}));
+    if(want.has("leaves"))jobs.push(fbGet("leaves",t).then(v=>setLeaves(flatten(v))).catch(e=>{throw e}));
+    if(want.has("locationIncidents"))jobs.push(fbGet("locationIncidents",t).then(v=>setLocationIncidents(flatten(v))).catch(()=>setLocationIncidents([])));
+    await Promise.allSettled(jobs);
+    return;
   }
-},[]);
+  // الموظف: قراءة بياناته فقط، مع دمج UID ومعرف الموظف القديم حتى لا يختفي التحضير بعد التحديث.
+  const keys=[...new Set(empKeys)];
+  const attReads=await Promise.allSettled(keys.map(k=>fbGet(`attendance/${k}`,t)));
+  const advReads=await Promise.allSettled(keys.map(k=>fbGet(`advances/${k}`,t)));
+  const leaveReads=await Promise.allSettled(keys.map(k=>fbGet(`leaves/${k}`,t)));
+  const as=attReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
+  const avs=advReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
+  const ls=leaveReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
+  const dedupe=(arr,keyFn)=>{const m=new Map();arr.forEach(x=>m.set(keyFn(x),x));return [...m.values()]};
+  const att=dedupe(as,x=>[x.employeeId||x.authUid||s.uid,recordDate(x),x.checkInTime||x.checkIn||x.inTime||x.clockIn||"",x.checkOutTime||x.checkOut||x.outTime||x.clockOut||""].join("|"));
+  const adv=dedupe(avs,x=>String(x.id||`${x.requestDate||x.date||""}-${x.amount||0}`));
+  const lev=dedupe(ls,x=>String(x.id||`${x.start||x.startDate||""}-${x.end||x.endDate||""}`));
+  setAttendance(prev=>dedupe([...prev,...att],x=>[x.employeeId||x.authUid||s.uid,recordDate(x),x.checkInTime||x.checkIn||x.inTime||x.clockIn||"",x.checkOutTime||x.checkOut||x.outTime||x.clockOut||""].join("|")));
+  setAdvances(prev=>dedupe([...prev,...adv],x=>String(x.id||`${x.requestDate||x.date||""}-${x.amount||0}`)));
+  setLeaves(prev=>dedupe([...prev,...lev],x=>String(x.id||`${x.start||x.startDate||""}-${x.end||x.endDate||""}`)));
+  setLocationIncidents([]);
+},[profile?.id]);
 const openNotification=async(n)=>{
  if(!n)return;
  const now=Date.now();
@@ -604,7 +614,7 @@ const openNotification=async(n)=>{
  const requestId=n.requestId||n.payload?.requestId||n.payload?.id;
  setTimeout(()=>window.dispatchEvent(new CustomEvent("tal-notification-open",{detail:{...n,target,requestId}})),0);
 };
-const login=async(email,password)=>{const d=await signIn(email,password);const p=await resolveEmployeeForAuth(d.localId,d.email||email,d.idToken);if(!p)throw Error("لم يتم العثور على ملف الموظف المرتبط بهذا الحساب.");if(p.active===false)throw Error("هذا الحساب موجود في أرشيف الموظفين وموقوف حاليًا. يرجى مراجعة المشرف لإعادته للعمل.");const s={idToken:d.idToken,refreshToken:d.refreshToken,uid:d.localId,email:d.email||email,role:p.role||"employee"};setSession(s);setProfile({...p,authUid:d.localId});setLoading(false);localStorage.setItem("tal_session",JSON.stringify({refreshToken:d.refreshToken,email:d.email||email}));return s} ;
+const login=async(email,password)=>{const d=await signIn(email,password);const p=await resolveEmployeeForAuth(d.localId,d.email||email,d.idToken);if(!p)throw Error("تم تسجيل الدخول في Firebase لكن لم يتم العثور على ملف الموظف المرتبط بالحساب.");const isAdmin=String(p.role||"").toLowerCase()==="admin"||String(p.role||"").toLowerCase()==="supervisor"||String(p.role||"").toLowerCase()==="manager";if(p.active===false&&!isAdmin)throw Error("هذا الحساب موظف وموقوف حاليًا. يرجى مراجعة المشرف لإعادته للعمل.");const s={idToken:d.idToken,refreshToken:d.refreshToken,uid:d.localId,email:d.email||email,role:p.role||"employee"};setSession(s);setProfile({...p,active:isAdmin?true:p.active,authUid:d.localId});setLoading(false);localStorage.setItem("tal_session",JSON.stringify({refreshToken:d.refreshToken,email:d.email||email,role:p.role||"employee"}));return s} ;
 useEffect(()=>{(async()=>{
   try{
     const z=JSON.parse(localStorage.getItem("tal_session")||"null");
@@ -612,9 +622,11 @@ useEffect(()=>{(async()=>{
       const r=await refresh(z.refreshToken);
       const uidFrom=JSON.parse(atob(r.idToken.split(".")[1])).user_id;
       const p=await resolveEmployeeForAuth(uidFrom,z.email||"",r.idToken);
-      if(p&&p.active!==false){
+      const role=String(p?.role||"employee").toLowerCase();
+      const isAdmin=role==="admin"||role==="supervisor"||role==="manager";
+      if(p&&(p.active!==false||isAdmin)){
         const s={idToken:r.idToken,refreshToken:r.refreshToken,uid:uidFrom,email:z.email||p.email||"",role:p.role||"employee"};
-        setSession(s);setProfile({...p,authUid:uidFrom});
+        setSession(s);setProfile({...p,active:isAdmin?true:p.active,authUid:uidFrom});
         setLoading(false);
         load(s).catch(()=>{});
         return;
@@ -623,7 +635,7 @@ useEffect(()=>{(async()=>{
   }catch(e){}
   setLoading(false);
 })()},[load]);
-useEffect(()=>{if(!session)return;let busy=false;const refreshData=async()=>{if(busy)return;busy=true;try{await loadHeavy(session);await loadNotifications(session)}catch(e){if(e?.message==="AUTH_EXPIRED"&&session.refreshToken){try{const r=await refresh(session.refreshToken);const ns={...session,idToken:r.idToken,refreshToken:r.refreshToken,uid:session.uid,email:session.email,role:session.role};setSession(ns);localStorage.setItem("tal_session",JSON.stringify({refreshToken:r.refreshToken,email:session.email||"",role:session.role||"employee"}));await load(ns);await loadHeavy(ns);await loadNotifications(ns)}catch(_){}}}finally{busy=false}};refreshData();const id=setInterval(refreshData,30000);const vis=()=>{if(document.visibilityState==="visible")refreshData()};document.addEventListener("visibilitychange",vis);return()=>{clearInterval(id);document.removeEventListener("visibilitychange",vis)}},[session,load,loadHeavy]);
+useEffect(()=>{if(!session)return;let busy=false;const refreshData=async()=>{if(busy)return;busy=true;try{await loadHeavy(session,session.role==="admin"?"none":"all");await loadNotifications(session)}catch(e){if(e?.message==="AUTH_EXPIRED"&&session.refreshToken){try{const r=await refresh(session.refreshToken);const ns={...session,idToken:r.idToken,refreshToken:r.refreshToken,uid:session.uid,email:session.email,role:session.role};setSession(ns);localStorage.setItem("tal_session",JSON.stringify({refreshToken:r.refreshToken,email:session.email||"",role:session.role||"employee"}));await load(ns);await loadHeavy(ns,ns.role==="admin"?"none":"all");await loadNotifications(ns)}catch(_){}}}finally{busy=false}};refreshData();const id=setInterval(refreshData,30000);const vis=()=>{if(document.visibilityState==="visible")refreshData()};document.addEventListener("visibilitychange",vis);return()=>{clearInterval(id);document.removeEventListener("visibilitychange",vis)}},[session,load,loadHeavy]);
 useEffect(()=>{if(!session)return;let timer=null;const trigger=()=>{clearTimeout(timer);timer=setTimeout(()=>loadNotifications(session).catch(()=>{}),180)};const pkey=profile?.id;const employeePath=profile?.role==="admin"?"employees":`employees/${encodeURIComponent(pkey||session.uid)}`;const notificationPaths=[`notifications/${encodeURIComponent(session.uid)}`];if(pkey&&String(pkey)!==String(session.uid))notificationPaths.push(`notifications/${encodeURIComponent(pkey)}`);const stops=[employeePath,...notificationPaths].map(path=>startFirebaseStream(path,session.idToken,trigger));return()=>{clearTimeout(timer);stops.forEach(fn=>fn&&fn())}},[session,load,profile?.role,profile?.id]);
 useEffect(()=>{if(!session?.uid)return;const e=employees.find(x=>String(x.id)===String(session.uid)||String(x.authUid||"")===String(session.uid)||(session.email&&String(x.email||"").toLowerCase()===String(session.email||"").toLowerCase()));if(e)setProfile(p=>({...p,...e,authUid:session.uid,photoData:photoOf(e)||photoOf(p)||""}))},[employees,session?.uid]);
 const logout=()=>{setSession(null);setProfile(null);localStorage.removeItem("tal_session")};const branch=branches.find(b=>b.id===profile?.branchId)||branches[0]||DEFAULT_BRANCH;const addAttendance=async({type,selfie,distance,lat,lng,securityEvent,securityReason,accuracy,locationTimestamp})=>{
@@ -728,5 +740,5 @@ const deactivate=async(id)=>{const emp=employees.find(x=>String(x.id)===String(i
 سيتم نقله إلى أرشيف الموظفين ويمكن إرجاعه لاحقًا.`))return;const archived={...emp,active:false,archivedAt:Date.now(),archivedBy:profile?.name||"المشرف"};delete archived.nationalId;delete archived.bankAccount;delete archived.iban;await fbPut(`archivedEmployees/${id}`,archived,session.idToken);await fbPatch(`employees/${id}`,{active:false,archivedAt:archived.archivedAt,archivedBy:archived.archivedBy},session.idToken);setEmployees(e=>e.map(x=>x.id===id?{...x,active:false,archivedAt:archived.archivedAt}:x));};
 const restoreEmployee=async(id)=>{const emp=employees.find(x=>String(x.id)===String(id));if(!emp)return;await fbPatch(`employees/${id}`,{active:true,archivedAt:null,archivedBy:null},session.idToken);await fbPatch(`archivedEmployees/${id}`,{active:true,restoredAt:Date.now(),restoredBy:profile?.name||"المشرف"},session.idToken).catch(()=>{});setEmployees(e=>e.map(x=>x.id===id?{...x,active:true,archivedAt:null}:x));};
 const cleanupEmployeeData=async()=>{if(!window.confirm("سيتم حذف رقم الهوية والآيبان/الحساب البنكي من جميع سجلات الموظفين. هل تريد المتابعة؟"))return;let n=0;for(const e of employees){const patch={nationalId:null,bankAccount:null,iban:null,idNumber:null};try{await fbPatch(`employees/${e.id}`,patch,session.idToken);n++}catch(_){}}setEmployees(e=>e.map(x=>{const y={...x};delete y.nationalId;delete y.bankAccount;delete y.iban;delete y.idNumber;return y}));alert(`تم تنظيف بيانات ${n} موظفًا.`)};
-const manageAdvance=async(a,change)=>{const path=`advances/${a.employeeId}/${a.id}`;if(change.action==="resplit"){const bal=Math.max(0,Number(change.remainingBalance)||0),n=Math.max(1,Number(change.installments)||1);await fbPatch(path,{remainingBalance:bal,remainingInstallments:n,installmentsCount:n,installmentAmount:Math.round(bal/n*100)/100,managementHistory:[...(a.managementHistory||[]),{action:"resplit",date:today(),by:profile?.name||"المشرف",remainingBalance:bal,installments:n}]},session.idToken)}else if(change.action==="pay"){const pay=Math.min(Math.max(0,Number(change.amount)||0),Math.max(0,Number(a.remainingBalance)||0));const remBal=Math.max(0,Number(a.remainingBalance||0)-pay),remInst=Math.max(0,Number(a.remainingInstallments||0)-(pay>0?1:0));await fbPatch(path,{remainingBalance:remBal,remainingInstallments:remInst,status:remBal<=0?"closed":"approved",paidAmount:toNum(a.paidAmount)+pay,managementHistory:[...(a.managementHistory||[]),{action:"pay",date:today(),by:profile?.name||"المشرف",amount:pay}]},session.idToken)}else if(change.action==="close"){await fbPatch(path,{status:"closed",remainingBalance:0,remainingInstallments:0,closedAt:Date.now(),closedBy:profile?.name||"المشرف"},session.idToken)}await load(session)};const saveBranch=async(b)=>{b={...b,lat:Number(b.lat)||DEFAULT_BRANCH.lat,lng:Number(b.lng)||DEFAULT_BRANCH.lng,radiusMeters:Math.max(10,Math.min(5000,Number(b.radiusMeters)||300)),requiredHours:8,graceMinutes:15,reminderBeforeStart:Math.max(5,Math.min(180,Number(b.reminderBeforeStart)||30)),reminderBeforeEnd:Math.max(5,Math.min(180,Number(b.reminderBeforeEnd)||15))};await fbPut(`branches/${b.id}`,b,session.idToken);setBranches(x=>x.map(y=>y.id===b.id?b:y))};const addBranch=async(b)=>{b={...b,lat:Number(b.lat)||DEFAULT_BRANCH.lat,lng:Number(b.lng)||DEFAULT_BRANCH.lng,radiusMeters:Math.max(10,Math.min(5000,Number(b.radiusMeters)||300)),requiredHours:8,graceMinutes:15,reminderBeforeStart:Math.max(5,Math.min(180,Number(b.reminderBeforeStart)||30)),reminderBeforeEnd:Math.max(5,Math.min(180,Number(b.reminderBeforeEnd)||15))};await fbPut(`branches/${b.id}`,b,session.idToken);setBranches(x=>[...x,b])};const deleteBranch=async(id)=>{await fbDelete(`branches/${id}`,session.idToken);setBranches(x=>x.filter(b=>b.id!==id))};const decision=async(r,status,type)=>{if(status==="approvedSettlement"||status==="rejectedSettlement"){const st=status==="approvedSettlement"?"approved":"rejected",req={...r.settlementRequest,status:st};if(st==="approved"){req.deductionMonth=monthKey(today())}const patch={settlementRequest:req};if(st==="approved")Object.assign(patch,{remainingInstallments:0,remainingBalance:0});await fbPatch(`advances/${r.employeeId}/${r.id}`,patch,session.idToken);setAdvances(a=>a.map(x=>x.id===r.id?{...x,...patch}:x));try{const nid=uid();await fbPut(`notifications/${r.employeeId}/${nid}`,{id:nid,title:"تحديث طلب السداد",message:`تم ${st==="approved"?"الموافقة على":"رفض"} طلب سداد المتبقي من السلفة.`,type:"settlement",createdAt:Date.now(),read:false,requestId:r.id,payload:{requestId:r.id,id:r.id},status:st},session.idToken)}catch(e){}return}const path=type==="leave"?"leaves":"advances";await fbPatch(`${path}/${r.employeeId}/${r.id}`,{status},session.idToken);const set=type==="leave"?setLeaves:setAdvances;set(a=>a.map(x=>x.id===r.id&&x.employeeId===r.employeeId?{...x,status}:x));try{const nid=uid();await fbPut(`notifications/${r.employeeId}/${nid}`,{id:nid,title:type==="leave"?"تحديث طلب الإجازة":"تحديث طلب السلفة",message:`تم ${status==="approved"?"الموافقة على":status==="rejected"?"رفض":"تحديث حالة"} طلبك من المشرف.`,type,createdAt:Date.now(),read:false,requestId:r.id,status,payload:{requestId:r.id,id:r.id}},session.idToken)}catch(e){}};if(loading)return h("div",{className:"app-bg min-h-screen grid place-items-center p-6"},h("div",{className:"glass rounded-3xl p-7 text-center max-w-md w-full"},[h(Logo,{large:true}),h("div",{className:"font-black text-xl mt-4"},"جاري تجهيز النظام…"),h("div",{className:"muted text-sm mt-2"},"يتم التحقق من الحساب وتحميل البيانات الأساسية."),h("div",{className:"mt-5 h-1.5 rounded-full bg-white/10 overflow-hidden"},h("div",{className:"h-full bg-cyan-400 rounded-full animate-pulse",style:{width:"62%"}}))]));if(!session)return h(Login,{onLogin:login});return profile.role==="admin"?h(Admin,{profile,token:session.idToken,employees,branches,attendance,advances,leaves,locationIncidents,onLogout:logout,onAddEmployee:addEmp,onUpdateEmployee:updateEmp,onDeactivate:deactivate,onSaveBranch:saveBranch,onAddBranch:addBranch,onDeleteBranch:deleteBranch,onDecision:(r,s)=>decision(r,s,"advance"),onLeaveDecision:(r,s)=>decision(r,s,"leave"),onUpdateAttendance:updateAttendance,onImportPdf:importPdf,onRepairPhotos:repairAllEmployeePhotos,onRepairAttendance:repairAttendanceHistory,onRepairPayroll:repairImportedPayroll,notifications,onNotificationOpen:openNotification,onManageAdvance:manageAdvance,onRestoreEmployee:restoreEmployee,onCleanupEmployeeData:cleanupEmployeeData,onMigratePhotos:migratePhotosOutOfEmployees}):h(Employee,{user:profile,branch,attendance:attendance.filter(a=>employeeMatchesRecord(profile,a)),advances:advances.filter(a=>employeeMatchesRecord(profile,a)),leaves:leaves.filter(a=>employeeMatchesRecord(profile,a)),notifications,onNotificationOpen:openNotification,onAttendance:addAttendance,onAdvance:addAdvance,onSettlement:addSettlement,onLeave:addLeave,onLogout:logout})}
+const manageAdvance=async(a,change)=>{const path=`advances/${a.employeeId}/${a.id}`;if(change.action==="resplit"){const bal=Math.max(0,Number(change.remainingBalance)||0),n=Math.max(1,Number(change.installments)||1);await fbPatch(path,{remainingBalance:bal,remainingInstallments:n,installmentsCount:n,installmentAmount:Math.round(bal/n*100)/100,managementHistory:[...(a.managementHistory||[]),{action:"resplit",date:today(),by:profile?.name||"المشرف",remainingBalance:bal,installments:n}]},session.idToken)}else if(change.action==="pay"){const pay=Math.min(Math.max(0,Number(change.amount)||0),Math.max(0,Number(a.remainingBalance)||0));const remBal=Math.max(0,Number(a.remainingBalance||0)-pay),remInst=Math.max(0,Number(a.remainingInstallments||0)-(pay>0?1:0));await fbPatch(path,{remainingBalance:remBal,remainingInstallments:remInst,status:remBal<=0?"closed":"approved",paidAmount:toNum(a.paidAmount)+pay,managementHistory:[...(a.managementHistory||[]),{action:"pay",date:today(),by:profile?.name||"المشرف",amount:pay}]},session.idToken)}else if(change.action==="close"){await fbPatch(path,{status:"closed",remainingBalance:0,remainingInstallments:0,closedAt:Date.now(),closedBy:profile?.name||"المشرف"},session.idToken)}await load(session)};const saveBranch=async(b)=>{b={...b,lat:Number(b.lat)||DEFAULT_BRANCH.lat,lng:Number(b.lng)||DEFAULT_BRANCH.lng,radiusMeters:Math.max(10,Math.min(5000,Number(b.radiusMeters)||300)),requiredHours:8,graceMinutes:15,reminderBeforeStart:Math.max(5,Math.min(180,Number(b.reminderBeforeStart)||30)),reminderBeforeEnd:Math.max(5,Math.min(180,Number(b.reminderBeforeEnd)||15))};await fbPut(`branches/${b.id}`,b,session.idToken);setBranches(x=>x.map(y=>y.id===b.id?b:y))};const addBranch=async(b)=>{b={...b,lat:Number(b.lat)||DEFAULT_BRANCH.lat,lng:Number(b.lng)||DEFAULT_BRANCH.lng,radiusMeters:Math.max(10,Math.min(5000,Number(b.radiusMeters)||300)),requiredHours:8,graceMinutes:15,reminderBeforeStart:Math.max(5,Math.min(180,Number(b.reminderBeforeStart)||30)),reminderBeforeEnd:Math.max(5,Math.min(180,Number(b.reminderBeforeEnd)||15))};await fbPut(`branches/${b.id}`,b,session.idToken);setBranches(x=>[...x,b])};const deleteBranch=async(id)=>{await fbDelete(`branches/${id}`,session.idToken);setBranches(x=>x.filter(b=>b.id!==id))};const decision=async(r,status,type)=>{if(status==="approvedSettlement"||status==="rejectedSettlement"){const st=status==="approvedSettlement"?"approved":"rejected",req={...r.settlementRequest,status:st};if(st==="approved"){req.deductionMonth=monthKey(today())}const patch={settlementRequest:req};if(st==="approved")Object.assign(patch,{remainingInstallments:0,remainingBalance:0});await fbPatch(`advances/${r.employeeId}/${r.id}`,patch,session.idToken);setAdvances(a=>a.map(x=>x.id===r.id?{...x,...patch}:x));try{const nid=uid();await fbPut(`notifications/${r.employeeId}/${nid}`,{id:nid,title:"تحديث طلب السداد",message:`تم ${st==="approved"?"الموافقة على":"رفض"} طلب سداد المتبقي من السلفة.`,type:"settlement",createdAt:Date.now(),read:false,requestId:r.id,payload:{requestId:r.id,id:r.id},status:st},session.idToken)}catch(e){}return}const path=type==="leave"?"leaves":"advances";await fbPatch(`${path}/${r.employeeId}/${r.id}`,{status},session.idToken);const set=type==="leave"?setLeaves:setAdvances;set(a=>a.map(x=>x.id===r.id&&x.employeeId===r.employeeId?{...x,status}:x));try{const nid=uid();await fbPut(`notifications/${r.employeeId}/${nid}`,{id:nid,title:type==="leave"?"تحديث طلب الإجازة":"تحديث طلب السلفة",message:`تم ${status==="approved"?"الموافقة على":status==="rejected"?"رفض":"تحديث حالة"} طلبك من المشرف.`,type,createdAt:Date.now(),read:false,requestId:r.id,status,payload:{requestId:r.id,id:r.id}},session.idToken)}catch(e){}};if(loading)return h("div",{className:"app-bg min-h-screen grid place-items-center p-6"},h("div",{className:"glass rounded-3xl p-7 text-center max-w-md w-full"},[h(Logo,{large:true}),h("div",{className:"font-black text-xl mt-4"},"جاري تجهيز النظام…"),h("div",{className:"muted text-sm mt-2"},"يتم التحقق من الحساب وتحميل البيانات الأساسية."),h("div",{className:"mt-5 h-1.5 rounded-full bg-white/10 overflow-hidden"},h("div",{className:"h-full bg-cyan-400 rounded-full animate-pulse",style:{width:"62%"}}))]));if(!session)return h(Login,{onLogin:login});return profile.role==="admin"?h(Admin,{profile,token:session.idToken,employees,branches,attendance,advances,leaves,locationIncidents,onLogout:logout,onAddEmployee:addEmp,onUpdateEmployee:updateEmp,onDeactivate:deactivate,onSaveBranch:saveBranch,onAddBranch:addBranch,onDeleteBranch:deleteBranch,onDecision:(r,s)=>decision(r,s,"advance"),onLeaveDecision:(r,s)=>decision(r,s,"leave"),onUpdateAttendance:updateAttendance,onImportPdf:importPdf,onRepairPhotos:repairAllEmployeePhotos,onRepairAttendance:repairAttendanceHistory,onRepairPayroll:repairImportedPayroll,notifications,onNotificationOpen:openNotification,onManageAdvance:manageAdvance,onRestoreEmployee:restoreEmployee,onCleanupEmployeeData:cleanupEmployeeData,onMigratePhotos:migratePhotosOutOfEmployees,onLoadSection:(section)=>loadHeavy(session,section)}):h(Employee,{user:profile,branch,attendance:attendance.filter(a=>employeeMatchesRecord(profile,a)),advances:advances.filter(a=>employeeMatchesRecord(profile,a)),leaves:leaves.filter(a=>employeeMatchesRecord(profile,a)),notifications,onNotificationOpen:openNotification,onAttendance:addAttendance,onAdvance:addAdvance,onSettlement:addSettlement,onLeave:addLeave,onLogout:logout})}
 ReactDOM.createRoot(document.getElementById("root")).render(h(App));</script></body></html>
