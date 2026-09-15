@@ -257,9 +257,11 @@ function shiftMetrics(rec,branch){
   let co=minutes(rec.checkOutTime);
   if(co==null && isToday && ci!=null) co=minutes(now());
   if(ci==null || co==null){
-    if(storedWork>0 || storedOt>0){
-      const regular=Math.min(8,Math.max(0,storedWork-storedOt));
-      return{work:storedWork,regular,otBefore:toNum(rec.overtimeBefore),otAfter:toNum(rec.overtimeAfter),ot:storedOt};
+    if(storedWork>0){
+      // لا يوجد إضافي قبل إتمام ساعات العمل المطلوبة كاملة.
+      const regular=Math.min(8,Math.max(0,storedWork));
+      const ot=Math.max(0,storedWork-8);
+      return{work:storedWork,regular,otBefore:0,otAfter:ot,ot};
     }
     return{work:0,regular:0,otBefore:0,otAfter:0,ot:0};
   }
@@ -269,9 +271,19 @@ function shiftMetrics(rec,branch){
   // وقت التحضير المحفوظ يظل هو الوقت الفعلي للموظف، لكن التأخير حتى مدة السماح لا يخصم من الراتب.
   // مثال: بداية الفرع 09:00، حضر 09:10 => يُحسب له 8 ساعات كاملة إذا انصرف 17:00.
   const paidCi=(ci>ss && ci<=ss+grace)?ss:ci;
-  const work=Math.max(0,(co-ci)/60),paidWork=Math.max(0,(co-paidCi)/60),before=Math.max(0,Math.min(work,(ss-ci)/60)),after=Math.max(0,Math.min(work,(co-se)/60));
-  const regular=Math.min(8,Math.max(0,paidWork-before-after));
-  return{work,regular,otBefore:before,otAfter:after,ot:before+after};
+  const work=Math.max(0,(co-ci)/60);
+  const paidWork=Math.max(0,(co-paidCi)/60);
+  // الإضافي لا يبدأ إلا بعد إتمام الساعات المطلوبة كاملة.
+  // 08:00→15:30 = 7.5 ساعات => 0 إضافي.
+  // 08:00→17:00 = 9 ساعات => 1 ساعة إضافي.
+  // 09:10→17:00 داخل السماح = 8 ساعات مدفوعة كاملة => 0 إضافي.
+  const regular=Math.min(8,Math.max(0,paidWork));
+  const ot=Math.max(0,paidWork-8);
+  // لا نعتبر وقت ما قبل بداية الفرع إضافيًا قبل اكتمال الساعات المطلوبة.
+  // بعد اكتمال الساعات الثماني يظهر الإضافي في خانة ما بعد الدوام.
+  const before=0;
+  const after=ot;
+  return{work,regular,otBefore:before,otAfter:after,ot};
 }
 function recordBranch(a,e,branches){if(a?.branchId)return branches.find(b=>String(b.id)===String(a.branchId))||{...DEFAULT_BRANCH,id:a.branchId,name:a.branchName||DEFAULT_BRANCH.name,lat:a.branchLat??DEFAULT_BRANCH.lat,lng:a.branchLng??DEFAULT_BRANCH.lng,shiftStart:a.branchShiftStart||DEFAULT_BRANCH.shiftStart,shiftEnd:a.branchShiftEnd||DEFAULT_BRANCH.shiftEnd,radiusMeters:a.branchRadiusMeters??DEFAULT_BRANCH.radiusMeters};if(a?.branchName){const byName=(branches||[]).find(b=>String(b.name||"").trim().toLowerCase()===String(a.branchName||"").trim().toLowerCase());if(byName)return byName;}return branches.find(b=>String(b.id)===String(e?.branchId))||branches[0]||DEFAULT_BRANCH}
 function employeeMatchesRecord(e,r){const norm=v=>String(v??"").trim().toLowerCase().replace(/\s+/g," ");const ids=[e?.id,e?.uid,e?.authUid,e?.userId,e?.employeeId,e?.employeeCode,e?.pdfNo,e?.email].filter(v=>v!==undefined&&v!==null&&String(v)!=="").map(String);const rids=[r?.employeeId,r?.uid,r?.userId,r?.authUid,r?.employeeCode,r?.pdfNo,r?.email].filter(v=>v!==undefined&&v!==null&&String(v)!=="").map(String);if(rids.some(x=>ids.includes(x)))return true;const ee=norm(e?.email),re=norm(r?.email);if(ee&&re&&ee===re)return true;const en=norm(e?.name||e?.fullName||e?.employeeName),rn=norm(r?.employeeName||r?.name||r?.fullName);return !!(en&&rn&&en===rn);}
