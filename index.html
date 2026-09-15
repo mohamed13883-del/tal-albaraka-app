@@ -129,6 +129,7 @@ const refresh = async (token) => { const r = await fetch(`${REFRESH_BASE}?key=${
     throw Error("Session refresh failed"); return { idToken: d.id_token, refreshToken: d.refresh_token, expiresIn: d.expires_in }; };
 const tokenOf = token => typeof token === "string" ? token : (token?.idToken || token?.token || "");
 async function fbGet(path, token) { const t=tokenOf(token); const r=await fetch(`${DB_URL}/${path}.json?auth=${encodeURIComponent(t)}`); if(r.status===401) throw Error("AUTH_EXPIRED"); return r.ok ? r.json() : null; }
+async function fbGetShallow(path, token) { const t=tokenOf(token); const r=await fetch(`${DB_URL}/${path}.json?shallow=true&auth=${encodeURIComponent(t)}`); if(r.status===401) throw Error("AUTH_EXPIRED"); return r.ok ? r.json() : null; }
 async function fbPut(path, data, token) { const t=tokenOf(token); const r=await fetch(`${DB_URL}/${path}.json?auth=${encodeURIComponent(t)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); if(r.status===401) throw Error("AUTH_EXPIRED"); if(!r.ok) throw Error("Database write failed"); return r.json(); }
 async function fbPatch(path, data, token) { const t=tokenOf(token); const r=await fetch(`${DB_URL}/${path}.json?auth=${encodeURIComponent(t)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); if(r.status===401) throw Error("AUTH_EXPIRED"); if(!r.ok) throw Error("Database update failed"); return r.json(); }
 async function fbDelete(path, token) { const t=tokenOf(token); const r=await fetch(`${DB_URL}/${path}.json?auth=${encodeURIComponent(t)}`, { method: "DELETE" }); if(r.status===401) throw Error("AUTH_EXPIRED"); }
@@ -461,27 +462,28 @@ function Admin({profile,token,employees,branches,attendance,advances,leaves,loca
  return h("div",{className:"page-shell"},[h(Header,{profile,onLogout}),h("div",{className:"app-layout"},[h(SideNav,{active:tab,onChange:setTab,items:[["home","الرئيسية","⌂"],["employees","الموظفون","👥"],["branches","الفروع","🏢"],["attendance","الحضور والانصراف","⌚"],["advances","السلف","💰"],["leaves","الإجازات","🗓"],["reports","تقارير الرواتب","▣"],["settings","الإعدادات","⚙"]]}),h("main",{className:"space-y-5 content-wrap"},h(NotificationPanel,{items:notifications,title:"إشعارات المشرف",onOpen:onNotificationOpen}),content)])])
 }
 async function resolveEmployeeForAuth(uid,email,token){
-  const es=await fbGet("employees",token);
-  if(!es)return null;
-  const entries=Object.entries(es);
   const em=String(email||"").trim().toLowerCase();
   const candidates=[];
-  if(es[uid]) candidates.push([uid,es[uid],3]);
-  entries.forEach(([id,v])=>{
-    if(String(v?.authUid||"")===String(uid) && id!==uid) candidates.push([id,v,4]);
-    if(em && String(v?.email||"").trim().toLowerCase()===em && id!==uid) candidates.push([id,v,5]);
-  });
+  // أهم مسار: ملف الموظف يحمل نفس UID، فلا نحمّل شجرة الموظفين كاملة.
+  try{const direct=await fbGet(`employees/${encodeURIComponent(uid)}`,token);if(direct)candidates.push([uid,direct,10]);}catch(e){}
+  if(!candidates.length){
+    try{
+      const es=await fbGet("employees",token);
+      if(es){
+        Object.entries(es).forEach(([id,v])=>{
+          if(String(v?.authUid||"")===String(uid))candidates.push([id,v,14]);
+          else if(em && String(v?.email||"").trim().toLowerCase()===em)candidates.push([id,v,13]);
+        });
+      }
+    }catch(e){}
+  }
   if(!candidates.length)return null;
   let best=null,bestScore=-1;
   for(const [id,v,base] of candidates){
     let photo=photoOf(v);
     if(!photo && !toNum(v?.photoRemovedAt)){
       for(const key of [id,v?.authUid,uid].filter(Boolean)){
-        try{
-          const one=await fbGet(`employeePhotos/${encodeURIComponent(key)}`,token);
-          photo=photoOf(one);
-          if(photo)break;
-        }catch(e){}
+        try{const one=await fbGet(`employeePhotos/${encodeURIComponent(key)}`,token);photo=photoOf(one);if(photo)break;}catch(e){}
       }
     }
     const score=base+(photo?20:0)+(v?.name?2:0)+(v?.email?2:0);
@@ -491,6 +493,7 @@ async function resolveEmployeeForAuth(uid,email,token){
   const merged=best.photo?{...best.v,photoData:best.photo,profilePhoto:best.photo,photo:best.photo,image:best.photo,avatar:best.photo}:best.v;
   return {...normalizeEmployee(best.id,merged),authUid:uid};
 }
+
 async function repairEmployeePhotoRecord(id,raw,token,photoStore){
   let photo=photoOf(raw);
   if(!photo) photo=photoOf(photoStore?.[id]);
@@ -502,6 +505,22 @@ async function repairEmployeePhotoRecord(id,raw,token,photoStore){
   if(raw?.authUid && String(raw.authUid)!==String(id)){try{await fbPut(`employeePhotos/${raw.authUid}`,{photoData:photo,updatedAt,employeeId:id},token)}catch(e){}}
   return {...raw,photoData:"",profilePhoto:""};
 }
+function flattenNotifications(obj){
+  if(!obj) return [];
+  const out=[];
+  const walk=(node,keyHint="")=>{
+    if(!node) return;
+    if(Array.isArray(node)){node.forEach((v,i)=>walk(v,String(i)));return;}
+    if(typeof node!=="object") return;
+    if(node.title||node.message||node.type||node.requestId||node.payload){
+      out.push({...node,id:node.id||keyHint,_notificationKey:keyHint});
+      return;
+    }
+    Object.entries(node).forEach(([k,v])=>{if(v&&typeof v==="object")walk(v,k);});
+  };
+  walk(obj);
+  return out;
+}
 function startFirebaseStream(path,token,onChange){
   if(!window.EventSource||!token)return ()=>{};
   let closed=false; const es=new EventSource(`${DB_URL}/${path}.json?auth=${encodeURIComponent(token)}`);
@@ -510,53 +529,79 @@ function startFirebaseStream(path,token,onChange){
   es.onerror=()=>{if(closed)es.close();};
   return ()=>{closed=true;es.close();};
 }
-function App(){const[session,setSession]=useState(null),[profile,setProfile]=useState(null),[employees,setEmployees]=useState([]),[branches,setBranches]=useState([]),[attendance,setAttendance]=useState([]),[advances,setAdvances]=useState([]),[leaves,setLeaves]=useState([]),[locationIncidents,setLocationIncidents]=useState([]),[notifications,setNotifications]=useState([]),[loading,setLoading]=useState(true);const load=useCallback(async(s)=>{
+function App(){const[session,setSession]=useState(null),[profile,setProfile]=useState(null),[employees,setEmployees]=useState([]),[branches,setBranches]=useState([]),[attendance,setAttendance]=useState([]),[advances,setAdvances]=useState([]),[leaves,setLeaves]=useState([]),[locationIncidents,setLocationIncidents]=useState([]),[notifications,setNotifications]=useState([]),[loading,setLoading]=useState(true);const loadNotifications=useCallback(async(s)=>{
   const t=tokenOf(s);
-  // تحميل البيانات الأساسية أولًا حتى تظهر لوحة المشرف بسرعة.
-  const core=await Promise.allSettled([fbGet("employees",t),fbGet("branches",t)]);
-  const es=core[0].status==="fulfilled"?core[0].value:null;
-  const bs=core[1].status==="fulfilled"?core[1].value:null;
-  const enrichedEmployees=es?Object.entries(es).map(([id,v])=>normalizeEmployee(id,v)):[];
-  setEmployees(enrichedEmployees);
-  setBranches(bs?Object.entries(bs).map(([id,v])=>({...DEFAULT_BRANCH,...v,id,radiusMeters:Math.max(10,Number(v.radiusMeters)||300),requiredHours:8,graceMinutes:15})):[]);
-  let resolved=null;
-  if(s?.uid){
-    resolved=await resolveEmployeeForAuth(s.uid,s.email||"",t).catch(()=>null);
-    if(resolved)setProfile(prev=>({...prev,...resolved,authUid:s.uid,photoData:photoOf(resolved)||photoOf(prev)||""}));
-  }
   try{
-    const keys=[s?.uid,resolved?.id].filter((v,i,a)=>v&&a.indexOf(v)===i);
+    const keys=[s?.uid,profile?.id].filter((v,i,a)=>v&&a.indexOf(v)===i);
     const ns=await Promise.allSettled(keys.map(k=>fbGet(`notifications/${encodeURIComponent(k)}`,t)));
     const merged=[];
-    ns.forEach(r=>{if(r.status==="fulfilled"&&r.value)merged.push(...flatten(r.value));});
+    ns.forEach((r,idx)=>{if(r.status==="fulfilled"&&r.value){const key=keys[idx];flattenNotifications(r.value).forEach(n=>merged.push({...n,_notificationKey:key}));}});
     const unique=new Map();
     merged.forEach(n=>unique.set(String(n.id||`${n.createdAt||0}-${n.title||""}-${n.message||""}`),n));
     setNotifications([...unique.values()].sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0)));
-  }catch(e){setNotifications([])}
-},[]);
+  }catch(e){}
+},[profile?.id]);
+const load=useCallback(async(s)=>{
+  const t=tokenOf(s);
+  const isAdmin=s?.role==="admin";
+  const core=await Promise.allSettled([
+    isAdmin?fbGetShallow("employees",t):fbGet(`employees/${encodeURIComponent(s?.uid||"")}`,t),
+    fbGet("branches",t)
+  ]);
+  const es=core[0].status==="fulfilled"?core[0].value:null;
+  const bs=core[1].status==="fulfilled"?core[1].value:null;
+  if(isAdmin){
+    const ids=es?Object.keys(es):[];
+    const detail=await Promise.allSettled(ids.map(id=>fbGet(`employees/${encodeURIComponent(id)}`,t)));
+    setEmployees(ids.map((id,i)=>detail[i].status==="fulfilled"&&detail[i].value?normalizeEmployee(id,detail[i].value):normalizeEmployee(id,es[id]||{})));
+  }else if(es)setEmployees([normalizeEmployee(s.uid,es)]);
+  setBranches(bs?Object.entries(bs).map(([id,v])=>({...DEFAULT_BRANCH,...v,id,radiusMeters:Math.max(10,Number(v.radiusMeters)||300),requiredHours:8,graceMinutes:15})):[]);
+  if(s?.uid){
+    const resolved=await resolveEmployeeForAuth(s.uid,s.email||"",t).catch(()=>null);
+    if(resolved)setProfile(prev=>({...prev,...resolved,authUid:s.uid,photoData:photoOf(resolved)||photoOf(prev)||""}));
+  }
+  await loadNotifications(s);
+},[loadNotifications]);
 const loadHeavy=useCallback(async(s)=>{
   const t=tokenOf(s);
-  const isAdmin=profile?.role==="admin";
+  const isAdmin=s?.role==="admin";
   const uidKey=encodeURIComponent(s?.uid||"");
-  const paths=isAdmin?["attendance","advances","leaves","locationIncidents"]:[`attendance/${uidKey}`,`advances/${uidKey}`,`leaves/${uidKey}`,null];
-  const settled=await Promise.allSettled(paths.map(path=>path?fbGet(path,t):Promise.resolve(null)));
-  const [as,avs,ls,lis]=settled.map(x=>x.status==="fulfilled"?x.value:null);
-  setAttendance(flatten(as));
-  setAdvances(flatten(avs));
-  setLeaves(flatten(ls));
-  setLocationIncidents(flatten(lis));
-},[profile?.role]);
+  const empKeys=[s?.uid,profile?.id].filter((v,i,a)=>v&&a.indexOf(v)===i).map(encodeURIComponent);
+  if(isAdmin){
+    const settled=await Promise.allSettled([fbGet("attendance",t),fbGet("advances",t),fbGet("leaves",t),fbGet("locationIncidents",t)]);
+    const [as,avs,ls,lis]=settled.map(x=>x.status==="fulfilled"?x.value:null);
+    setAttendance(flatten(as)); setAdvances(flatten(avs)); setLeaves(flatten(ls)); setLocationIncidents(flatten(lis));
+  }else{
+    // الموظف قد تكون سجلاته القديمة تحت employee id، بينما التحضير الجديد تحت auth UID.
+    // اقرأ الاثنين وادمجهما بدل استبدال الحالة بسجل فارغ عند التحديث.
+    const keys=[...new Set(empKeys)];
+    const attReads=await Promise.allSettled(keys.map(k=>fbGet(`attendance/${k}`,t)));
+    const advReads=await Promise.allSettled(keys.map(k=>fbGet(`advances/${k}`,t)));
+    const leaveReads=await Promise.allSettled(keys.map(k=>fbGet(`leaves/${k}`,t)));
+    const as=attReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
+    const avs=advReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
+    const ls=leaveReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
+    const dedupe=(arr,keyFn)=>{const m=new Map();arr.forEach(x=>m.set(keyFn(x),x));return [...m.values()]};
+    const att=dedupe(as,x=>[x.employeeId||x.authUid||s.uid,recordDate(x),x.checkInTime||x.checkIn||x.inTime||x.clockIn||"",x.checkOutTime||x.checkOut||x.outTime||x.clockOut||""].join("|"));
+    const adv=dedupe(avs,x=>String(x.id||`${x.requestDate||x.date||""}-${x.amount||0}`));
+    const lev=dedupe(ls,x=>String(x.id||`${x.start||x.startDate||""}-${x.end||x.endDate||""}`));
+    setAttendance(prev=>dedupe([...prev,...att],x=>[x.employeeId||x.authUid||s.uid,recordDate(x),x.checkInTime||x.checkIn||x.inTime||x.clockIn||"",x.checkOutTime||x.checkOut||x.outTime||x.clockOut||""].join("|")));
+    setAdvances(prev=>dedupe([...prev,...adv],x=>String(x.id||`${x.requestDate||x.date||""}-${x.amount||0}`)));
+    setLeaves(prev=>dedupe([...prev,...lev],x=>String(x.id||`${x.start||x.startDate||""}-${x.end||x.endDate||""}`)));
+    setLocationIncidents([]);
+  }
+},[]);
 const openNotification=async(n)=>{
  if(!n)return;
  const now=Date.now();
- if(n.id){try{await fbPatch(`notifications/${session.uid}/${n.id}`,{read:true,readAt:now},session.idToken)}catch(e){}}
+ if(n.id){try{const key=n._notificationKey||session.uid;await fbPatch(`notifications/${key}/${n.id}`,{read:true,readAt:now},session.idToken)}catch(e){}}
  setNotifications(prev=>prev.map(x=>String(x.id)===String(n.id)?{...x,read:true,readAt:now}:x));
  const type=String(n.type||"").toLowerCase();
  const target=type.includes("leave")?"leaves":(type.includes("advance")||type.includes("settlement"))?"advances":type==="location_security"?"attendance":"home";
  const requestId=n.requestId||n.payload?.requestId||n.payload?.id;
  setTimeout(()=>window.dispatchEvent(new CustomEvent("tal-notification-open",{detail:{...n,target,requestId}})),0);
 };
-const login=async(email,password)=>{const d=await signIn(email,password);const s={idToken:d.idToken,refreshToken:d.refreshToken,uid:d.localId,email:d.email||email};const p=await resolveEmployeeForAuth(d.localId,d.email||email,d.idToken);if(!p)throw Error("لم يتم العثور على ملف الموظف المرتبط بهذا الحساب.");if(p.active===false)throw Error("هذا الحساب موجود في أرشيف الموظفين وموقوف حاليًا. يرجى مراجعة المشرف لإعادته للعمل.");setSession(s);setProfile({...p,authUid:d.localId});setLoading(false);localStorage.setItem("tal_session",JSON.stringify({refreshToken:d.refreshToken,email:d.email||email}));return s} ;
+const login=async(email,password)=>{const d=await signIn(email,password);const p=await resolveEmployeeForAuth(d.localId,d.email||email,d.idToken);if(!p)throw Error("لم يتم العثور على ملف الموظف المرتبط بهذا الحساب.");if(p.active===false)throw Error("هذا الحساب موجود في أرشيف الموظفين وموقوف حاليًا. يرجى مراجعة المشرف لإعادته للعمل.");const s={idToken:d.idToken,refreshToken:d.refreshToken,uid:d.localId,email:d.email||email,role:p.role||"employee"};setSession(s);setProfile({...p,authUid:d.localId});setLoading(false);localStorage.setItem("tal_session",JSON.stringify({refreshToken:d.refreshToken,email:d.email||email}));return s} ;
 useEffect(()=>{(async()=>{
   try{
     const z=JSON.parse(localStorage.getItem("tal_session")||"null");
@@ -565,7 +610,7 @@ useEffect(()=>{(async()=>{
       const uidFrom=JSON.parse(atob(r.idToken.split(".")[1])).user_id;
       const p=await resolveEmployeeForAuth(uidFrom,z.email||"",r.idToken);
       if(p&&p.active!==false){
-        const s={idToken:r.idToken,refreshToken:r.refreshToken,uid:uidFrom,email:z.email||p.email||""};
+        const s={idToken:r.idToken,refreshToken:r.refreshToken,uid:uidFrom,email:z.email||p.email||"",role:p.role||"employee"};
         setSession(s);setProfile({...p,authUid:uidFrom});
         setLoading(false);
         load(s).catch(()=>{});
@@ -575,8 +620,8 @@ useEffect(()=>{(async()=>{
   }catch(e){}
   setLoading(false);
 })()},[load]);
-useEffect(()=>{if(!session)return;let busy=false;const refreshData=async()=>{if(busy)return;busy=true;try{await load(session);await loadHeavy(session)}catch(e){if(e?.message==="AUTH_EXPIRED"&&session.refreshToken){try{const r=await refresh(session.refreshToken);const ns={...session,idToken:r.idToken,refreshToken:r.refreshToken};setSession(ns);localStorage.setItem("tal_session",JSON.stringify({refreshToken:r.refreshToken,email:session.email||""}));await load(ns);await loadHeavy(ns)}catch(_){}}}finally{busy=false}};refreshData();const id=setInterval(refreshData,30000);const vis=()=>{if(document.visibilityState==="visible")refreshData()};document.addEventListener("visibilitychange",vis);return()=>{clearInterval(id);document.removeEventListener("visibilitychange",vis)}},[session,load,loadHeavy]);
-useEffect(()=>{if(!session)return;let timer=null;const trigger=()=>{clearTimeout(timer);timer=setTimeout(()=>load(session).catch(()=>{}),120)};const pkey=profile?.id;const employeePath=profile?.role==="admin"?"employees":`employees/${encodeURIComponent(pkey||session.uid)}`;const notificationPaths=[`notifications/${encodeURIComponent(session.uid)}`];if(pkey&&String(pkey)!==String(session.uid))notificationPaths.push(`notifications/${encodeURIComponent(pkey)}`);const stops=[employeePath,...notificationPaths].map(path=>startFirebaseStream(path,session.idToken,trigger));return()=>{clearTimeout(timer);stops.forEach(fn=>fn&&fn())}},[session,load,profile?.role,profile?.id]);
+useEffect(()=>{if(!session)return;let busy=false;const refreshData=async()=>{if(busy)return;busy=true;try{await loadHeavy(session);await loadNotifications(session)}catch(e){if(e?.message==="AUTH_EXPIRED"&&session.refreshToken){try{const r=await refresh(session.refreshToken);const ns={...session,idToken:r.idToken,refreshToken:r.refreshToken,uid:session.uid,email:session.email,role:session.role};setSession(ns);localStorage.setItem("tal_session",JSON.stringify({refreshToken:r.refreshToken,email:session.email||"",role:session.role||"employee"}));await load(ns);await loadHeavy(ns);await loadNotifications(ns)}catch(_){}}}finally{busy=false}};refreshData();const id=setInterval(refreshData,30000);const vis=()=>{if(document.visibilityState==="visible")refreshData()};document.addEventListener("visibilitychange",vis);return()=>{clearInterval(id);document.removeEventListener("visibilitychange",vis)}},[session,load,loadHeavy]);
+useEffect(()=>{if(!session)return;let timer=null;const trigger=()=>{clearTimeout(timer);timer=setTimeout(()=>loadNotifications(session).catch(()=>{}),180)};const pkey=profile?.id;const employeePath=profile?.role==="admin"?"employees":`employees/${encodeURIComponent(pkey||session.uid)}`;const notificationPaths=[`notifications/${encodeURIComponent(session.uid)}`];if(pkey&&String(pkey)!==String(session.uid))notificationPaths.push(`notifications/${encodeURIComponent(pkey)}`);const stops=[employeePath,...notificationPaths].map(path=>startFirebaseStream(path,session.idToken,trigger));return()=>{clearTimeout(timer);stops.forEach(fn=>fn&&fn())}},[session,load,profile?.role,profile?.id]);
 useEffect(()=>{if(!session?.uid)return;const e=employees.find(x=>String(x.id)===String(session.uid)||String(x.authUid||"")===String(session.uid)||(session.email&&String(x.email||"").toLowerCase()===String(session.email||"").toLowerCase()));if(e)setProfile(p=>({...p,...e,authUid:session.uid,photoData:photoOf(e)||photoOf(p)||""}))},[employees,session?.uid]);
 const logout=()=>{setSession(null);setProfile(null);localStorage.removeItem("tal_session")};const branch=branches.find(b=>b.id===profile?.branchId)||branches[0]||DEFAULT_BRANCH;const addAttendance=async({type,selfie,distance,lat,lng,securityEvent,securityReason,accuracy,locationTimestamp})=>{
  const date=today(),stamp=now(),activeBranch=branches.find(b=>b.id===profile?.branchId)||branch;
@@ -632,7 +677,32 @@ const repairImportedPayroll=async()=>{
  }catch(e){alert("تعذر تصحيح رواتب PDF: "+e.message)}
 };
 const repairAttendanceHistory=async()=>{
- try{const raw=await fbGet("attendance",session.idToken),records=flatten(raw);let fixed=0,skipped=0;for(const a of records){const date=recordDate(a);if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){skipped++;continue;}const emp=employees.find(e=>employeeMatchesRecord(e,a)||((a.employeeName||a.name)&&String(e.name||"").trim()===String(a.employeeName||a.name).trim()));if(!emp){skipped++;continue;}const b=recordBranch(a,emp,branches);const clean={...a,id:date,employeeId:emp.id,authUid:emp.authUid||a.authUid||a.employeeId||"",employeeCode:emp.employeeCode||a.employeeCode||"",employeeName:emp.name,date,branchId:b.id,branchName:b.name,branchLat:Number(a.branchLat??b.lat),branchLng:Number(a.branchLng??b.lng),branchRadiusMeters:Math.max(10,Number(a.branchRadiusMeters??b.radiusMeters)||300),branchShiftStart:a.branchShiftStart||b.shiftStart,branchShiftEnd:a.branchShiftEnd||b.shiftEnd};const m=shiftMetrics(clean,b);clean.workHours=m.work||toNum(a.workHours);clean.overtimeHours=m.ot||toNum(a.overtimeHours);clean.overtimeBefore=m.otBefore||toNum(a.overtimeBefore);clean.overtimeAfter=m.otAfter||toNum(a.overtimeAfter);await fbPut(`attendance/${emp.id}/${date}`,clean,session.idToken);const authId=emp.authUid||a.authUid||a.uid||a.userId||"";if(authId&&String(authId)!==String(emp.id))await fbPut(`attendance/${authId}/${date}`,{...clean,employeeId:authId,authUid:authId},session.idToken);fixed++;}await load(session);alert(`تمت إعادة بناء الحضور بأثر رجعي. تم ربط ${fixed} سجلًا${skipped?` وتجاوز ${skipped} سجل غير قابل للتعرّف`:""}.`)}catch(e){alert("تعذر تحديث الحضور بأثر رجعي: "+e.message)}};
+ try{
+  const raw=await fbGet("attendance",session.idToken);
+  const fresh=await fbGet("employees",session.idToken);
+  const empList=fresh?Object.entries(fresh).map(([id,v])=>normalizeEmployee(id,v)):employees;
+  const records=flatten(raw);
+  let fixed=0,skipped=0; const normalized=[];
+  for(const a of records){
+   const date=recordDate(a);
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){skipped++;continue;}
+   const emp=empList.find(e=>employeeMatchesRecord(e,a)||((a.employeeName||a.name)&&String(e.name||"").trim()===String(a.employeeName||a.name).trim())||((a.employeeCode||"")&&String(e.employeeCode||"")===String(a.employeeCode)));
+   if(!emp){skipped++;continue;}
+   const b=recordBranch(a,emp,branches);
+   const clean={...a,id:date,employeeId:emp.id,authUid:emp.authUid||a.authUid||a.uid||a.userId||"",employeeCode:emp.employeeCode||a.employeeCode||"",employeeName:emp.name,date,branchId:b.id,branchName:b.name,branchLat:Number(a.branchLat??b.lat),branchLng:Number(a.branchLng??b.lng),branchRadiusMeters:Math.max(10,Number(a.branchRadiusMeters??b.radiusMeters)||300),branchShiftStart:a.branchShiftStart||b.shiftStart,branchShiftEnd:a.branchShiftEnd||b.shiftEnd};
+   const m=shiftMetrics(clean,b);
+   clean.workHours=m.work||toNum(a.workHours);clean.overtimeHours=m.ot||toNum(a.overtimeHours);clean.overtimeBefore=m.otBefore||toNum(a.overtimeBefore);clean.overtimeAfter=m.otAfter||toNum(a.overtimeAfter);
+   // لا نحذف السجل الأصلي؛ نضيف نسخة موحدة يمكن للنظام قراءتها دائمًا.
+   await fbPut(`attendance/${emp.id}/${date}`,clean,session.idToken);
+   const authId=emp.authUid||a.authUid||a.uid||a.userId||"";
+   if(authId&&String(authId)!==String(emp.id))await fbPut(`attendance/${authId}/${date}`,{...clean,employeeId:authId,authUid:authId},session.idToken);
+   normalized.push(clean); fixed++;
+  }
+  setEmployees(empList);
+  setAttendance(prev=>{const map=new Map(prev.map(x=>[`${x.employeeId||""}|${recordDate(x)}`,x]));normalized.forEach(x=>map.set(`${x.employeeId}|${x.date}`,x));return [...map.values()];});
+  alert(`تمت إعادة بناء الحضور بأثر رجعي بدون حذف السجلات القديمة. تم ربط ${fixed} سجلًا${skipped?` وتجاوز ${skipped} سجل غير قابل للتعرّف`:""}.`);
+ }catch(e){alert("تعذر تحديث الحضور بأثر رجعي: "+e.message)}
+};
 const repairAllEmployeePhotos=async()=>{
   try{
     const es=await fbGet("employees",session.idToken),ps=await fbGet("employeePhotos",session.idToken);
