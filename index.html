@@ -59,35 +59,7 @@ table{border-spacing:0 6px}th{color:#82a9c0!important;text-transform:none}td{bac
 .gps-status{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:13px;background:rgba(34,229,138,.08);border:1px solid rgba(34,229,138,.18);color:#9affc8;font-size:12px}.gps-status.out{background:rgba(255,70,103,.08);border-color:rgba(255,70,103,.18);color:#ff9eb0}
 .pro-header{position:relative}.pro-header:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(25,200,255,.07),transparent);pointer-events:none}
 @media(max-width:900px){.page-shell{padding:10px}.app-layout{grid-template-columns:1fr}.side-nav{position:sticky;top:6px;z-index:20}.gps-ring{width:150px;height:150px}}
-</style></head><body><div id="root"></div>
-<script>
-(function(){
-  function showErr(msg){
-    var el=document.getElementById('err-overlay');
-    if(!el){
-      el=document.createElement('div');
-      el.id='err-overlay';
-      el.style.cssText='position:fixed;inset:0;background:#1a1a1a;color:#fff;z-index:999999;direction:rtl;text-align:right;font-family:sans-serif;padding:16px;overflow:auto;white-space:pre-wrap;font-size:14px;line-height:1.6';
-      document.body.appendChild(el);
-      var title=document.createElement('div');
-      title.textContent='حصل خطأ برمجي منع تحميل الصفحة:';
-      title.style.cssText='font-weight:bold;font-size:18px;margin-bottom:12px;color:#ff6b6b';
-      el.appendChild(title);
-    }
-    var line=document.createElement('div');
-    line.style.cssText='margin-top:8px;padding:8px;background:#2a2a2a;border-radius:6px;direction:ltr;text-align:left';
-    line.textContent=msg;
-    el.appendChild(line);
-  }
-  window.addEventListener('error',function(e){
-    showErr((e.message||'خطأ غير معروف')+' | '+(e.filename||'')+':'+(e.lineno||'')+':'+(e.colno||''));
-  });
-  window.addEventListener('unhandledrejection',function(e){
-    showErr('Promise rejection: '+(e.reason && (e.reason.stack||e.reason.message||e.reason)));
-  });
-})();
-</script>
-<script id="src">
+</style></head><body><div id="root"></div><script id="src">
 
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
@@ -333,18 +305,22 @@ async function resolveEmployeeForAuth(uid,email,token){
   const em=String(email||"").trim().toLowerCase();
   const candidates=[];
   // أهم مسار: ملف الموظف يحمل نفس UID، فلا نحمّل شجرة الموظفين كاملة.
-  try{const direct=await fbGet(`employees/${encodeURIComponent(uid)}`,token);if(direct)candidates.push([uid,direct,10]);}catch(e){}
-  if(!candidates.length){
-    try{
+  try{const direct=await fbGet(`employees/${encodeURIComponent(uid)}`,token);if(direct)candidates.push([uid,direct,20]);}catch(e){}
+  // إذا كان السجل المباشر قديمًا/مؤرشفًا، لا نتوقف عنده؛ ابحث أيضًا عن
+  // السجل النشط المرتبط بنفس authUid أو البريد. هذا يمنع تسجيل الدخول من
+  // اختيار نسخة موظف قديمة بالخطأ عندما توجد نسخة نشطة صحيحة.
+  try{
+    const needFallback=!candidates.length || candidates[0]?.[1]?.active===false;
+    if(needFallback){
       const es=await fbGet("employees",token);
       if(es){
         Object.entries(es).forEach(([id,v])=>{
-          if(String(v?.authUid||"")===String(uid))candidates.push([id,v,14]);
-          else if(em && String(v?.email||"").trim().toLowerCase()===em)candidates.push([id,v,13]);
+          if(String(v?.authUid||"")===String(uid) && String(id)!==String(uid))candidates.push([id,v,28]);
+          else if(em && String(v?.email||"").trim().toLowerCase()===em && String(id)!==String(uid))candidates.push([id,v,24]);
         });
       }
-    }catch(e){}
-  }
+    }
+  }catch(e){}
   if(!candidates.length)return null;
   let best=null,bestScore=-1;
   for(const [id,v,base] of candidates){
@@ -354,7 +330,7 @@ async function resolveEmployeeForAuth(uid,email,token){
         try{const one=await fbGet(`employeePhotos/${encodeURIComponent(key)}`,token);photo=photoOf(one);if(photo)break;}catch(e){}
       }
     }
-    const score=base+(v?.active===false?-100:100)+(v?.role==="admin"?30:0)+(photo?20:0)+(v?.name?2:0)+(v?.email?2:0);
+    const score=base+(v?.active===false?-1000:1000)+(v?.role==="admin"?60:0)+(photo?5:0)+(v?.name?3:0)+(v?.email?3:0);
     if(score>bestScore){bestScore=score;best={id,v,photo};}
   }
   if(!best)return null;
@@ -413,13 +389,15 @@ const load=useCallback(async(s)=>{
   const t=tokenOf(s);
   const isAdmin=s?.role==="admin";
   const core=await Promise.allSettled([
-    isAdmin?fbGet("employees",t):fbGet(`employees/${encodeURIComponent(s?.uid||"")}`,t),
+    isAdmin?fbGetShallow("employees",t):fbGet(`employees/${encodeURIComponent(s?.uid||"")}`,t),
     fbGet("branches",t)
   ]);
   const es=core[0].status==="fulfilled"?core[0].value:null;
   const bs=core[1].status==="fulfilled"?core[1].value:null;
   if(isAdmin){
-    setEmployees(es?Object.entries(es).map(([id,v])=>normalizeEmployee(id,v)):[]);
+    const ids=es?Object.keys(es):[];
+    const detail=await Promise.allSettled(ids.map(id=>fbGet(`employees/${encodeURIComponent(id)}`,t)));
+    setEmployees(ids.map((id,i)=>detail[i].status==="fulfilled"&&detail[i].value?normalizeEmployee(id,detail[i].value):normalizeEmployee(id,es[id]||{})));
   }else if(es)setEmployees([normalizeEmployee(s.uid,es)]);
   setBranches(bs?Object.entries(bs).map(([id,v])=>({...DEFAULT_BRANCH,...v,id,radiusMeters:Math.max(10,Number(v.radiusMeters)||300),requiredHours:8,graceMinutes:15})):[]);
   if(s?.uid){
