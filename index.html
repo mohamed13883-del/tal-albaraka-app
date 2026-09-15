@@ -443,10 +443,9 @@ function Admin({profile,employees,branches,attendance,advances,leaves,locationIn
  if(tab==="settings")content=h(Card,null,[h("h3",{className:"font-black mb-3"},"إعدادات النظام"),h("div",{className:"grid sm:grid-cols-2 lg:grid-cols-5 gap-3"},[["أيام العمل الشهرية","26"],["أيام الراحة المتغيرة","4"],["ساعات العمل الفعلية","8"],["سماح التحضير","15 دقيقة"],["نطاق GPS الافتراضي","300 متر"]].map(x=>h("div",{key:x[0],className:"stat rounded-xl p-3"},[h("div",{className:"muted text-xs"},x[0]),h("div",{className:"font-black text-lg"},x[1])]))),h("p",{className:"muted text-sm mt-4"},"قيمة الساعة = الراتب الأساسي ÷ 26 ÷ 8. الراتب يعتمد على ساعات الحضور الفعلية، وتُضاف الساعات الإضافية قبل بداية الدوام وبعد نهايته.")]);
  return h("div",{className:"page-shell"},[h(Header,{profile,onLogout}),h("div",{className:"app-layout"},[h(SideNav,{active:tab,onChange:setTab,items:[["home","الرئيسية","⌂"],["employees","الموظفون","👥"],["branches","الفروع","🏢"],["attendance","الحضور والانصراف","⌚"],["advances","السلف","💰"],["leaves","الإجازات","🗓"],["reports","تقارير الرواتب","▣"],["settings","الإعدادات","⚙"]]}),h("main",{className:"space-y-5 content-wrap"},content)])])
 }
-async function resolveEmployeeForAuth(uid,email,token){
+async async function resolveEmployeeForAuth(uid,email,token){
   const es=await fbGet("employees",token);
   if(!es)return null;
-  let photoStore={}; try{photoStore=await fbGet("employeePhotos",token)||{}}catch(e){}
   const entries=Object.entries(es);
   const em=String(email||"").trim().toLowerCase();
   const candidates=[];
@@ -459,13 +458,13 @@ async function resolveEmployeeForAuth(uid,email,token){
   let best=null,bestScore=-1;
   for(const [id,v,base] of candidates){
     let photo=photoOf(v);
-    const stores=Object.entries(photoStore||{});
     if(!photo && !toNum(v?.photoRemovedAt)){
-      const hit=photoStore?.[id] || photoStore?.[v?.authUid||""] || photoStore?.[uid];
-      photo=photoOf(hit);
-      if(!photo){
-        const sh=stores.find(([,x])=>String(x?.employeeId||"")===String(id)||String(x?.authUid||"")===String(uid)|| (em&&String(x?.email||"").toLowerCase()===em));
-        photo=photoOf(sh?.[1]);
+      for(const key of [id,v?.authUid,uid].filter(Boolean)){
+        try{
+          const one=await fbGet(`employeePhotos/${encodeURIComponent(key)}`,token);
+          photo=photoOf(one);
+          if(photo)break;
+        }catch(e){}
       }
     }
     const score=base+(photo?20:0)+(v?.name?2:0)+(v?.email?2:0);
@@ -498,14 +497,10 @@ function startFirebaseStream(path,token,onChange){
 function App(){const[session,setSession]=useState(null),[profile,setProfile]=useState(null),[employees,setEmployees]=useState([]),[branches,setBranches]=useState([]),[attendance,setAttendance]=useState([]),[advances,setAdvances]=useState([]),[leaves,setLeaves]=useState([]),[locationIncidents,setLocationIncidents]=useState([]),[notifications,setNotifications]=useState([]),[loading,setLoading]=useState(true);const load=useCallback(async(s)=>{
   const t=tokenOf(s);
   const settled=await Promise.allSettled([fbGet("employees",t),fbGet("branches",t),fbGet("attendance",t),fbGet("advances",t),fbGet("leaves",t),fbGet("locationIncidents",t).catch(()=>null)]); const [es,bs,as,avs,ls,lis]=settled.map(x=>x.status==="fulfilled"?x.value:null);
-  let photoStore={}; try{photoStore=await fbGet("employeePhotos",t)||{}}catch(e){}
+  // لا نحمّل مخزن الصور الكامل أثناء الدخول؛ الصور الكبيرة كانت سببًا رئيسيًا في بطء الشاشة.
+  // يتم تحميل بيانات الموظفين الأساسية أولاً، والصور الإضافية في الخلفية عند الحاجة.
   const enrichedEmployees=es?Object.entries(es).map(([id,v])=>{
-    let photo=photoOf(v);
-    if(!photo && !toNum(v?.photoRemovedAt)){
-      const direct=photoStore?.[id]||photoStore?.[v?.authUid||""]||photoStore?.[v?.uid||""]||{};
-      if(!photo) photo=photoOf(direct);
-      if(!photo){const hit=Object.values(photoStore||{}).find(x=>String(x?.employeeId||"")===String(id)||String(x?.authUid||"")===String(v?.authUid||""));photo=photoOf(hit);}
-    }
+    const photo=photoOf(v);
     return normalizeEmployee(id,photo?{...v,photoData:photo,profilePhoto:photo,photo,image:photo,avatar:photo}:v);
   }):[];
   setEmployees(enrichedEmployees);
@@ -517,8 +512,25 @@ function App(){const[session,setSession]=useState(null),[profile,setProfile]=use
     if(p)setProfile(prev=>({...prev,...p,authUid:s.uid,photoData:photoOf(p)||photoOf(prev)||""}));
   }
 },[]);
-const login=async(email,password)=>{const d=await signIn(email,password);const s={idToken:d.idToken,refreshToken:d.refreshToken,uid:d.localId,email:d.email||email};const p=await resolveEmployeeForAuth(d.localId,d.email||email,d.idToken);if(!p)throw Error("لم يتم العثور على ملف الموظف المرتبط بهذا الحساب.");if(p.active===false)throw Error("هذا الحساب موجود في أرشيف الموظفين وموقوف حاليًا. يرجى مراجعة المشرف لإعادته للعمل.");setSession(s);setProfile({...p,authUid:d.localId});localStorage.setItem("tal_session",JSON.stringify({refreshToken:d.refreshToken,email:d.email||email}));return s} ;
-useEffect(()=>{(async()=>{try{const z=JSON.parse(localStorage.getItem("tal_session")||"null");if(z?.refreshToken){const r=await refresh(z.refreshToken),uidFrom=JSON.parse(atob(r.idToken.split(".")[1])).user_id;const p=await resolveEmployeeForAuth(uidFrom,z.email||"",r.idToken);if(p&&p.active!==false){const s={idToken:r.idToken,refreshToken:r.refreshToken,uid:uidFrom,email:z.email||p.email||""};setSession(s);setProfile({...p,authUid:uidFrom});await load(s)}}}catch(e){}setLoading(false)})()},[load]);
+const login=async(email,password)=>{const d=await signIn(email,password);const s={idToken:d.idToken,refreshToken:d.refreshToken,uid:d.localId,email:d.email||email};const p=await resolveEmployeeForAuth(d.localId,d.email||email,d.idToken);if(!p)throw Error("لم يتم العثور على ملف الموظف المرتبط بهذا الحساب.");if(p.active===false)throw Error("هذا الحساب موجود في أرشيف الموظفين وموقوف حاليًا. يرجى مراجعة المشرف لإعادته للعمل.");setSession(s);setProfile({...p,authUid:d.localId});setLoading(false);localStorage.setItem("tal_session",JSON.stringify({refreshToken:d.refreshToken,email:d.email||email}));return s} ;
+useEffect(()=>{(async()=>{
+  try{
+    const z=JSON.parse(localStorage.getItem("tal_session")||"null");
+    if(z?.refreshToken){
+      const r=await refresh(z.refreshToken);
+      const uidFrom=JSON.parse(atob(r.idToken.split(".")[1])).user_id;
+      const p=await resolveEmployeeForAuth(uidFrom,z.email||"",r.idToken);
+      if(p&&p.active!==false){
+        const s={idToken:r.idToken,refreshToken:r.refreshToken,uid:uidFrom,email:z.email||p.email||""};
+        setSession(s);setProfile({...p,authUid:uidFrom});
+        setLoading(false);
+        load(s).catch(()=>{});
+        return;
+      }
+    }
+  }catch(e){}
+  setLoading(false);
+})()},[load]);
 useEffect(()=>{if(!session)return;let busy=false;const refreshData=async()=>{if(busy)return;busy=true;try{await load(session)}catch(e){if(e?.message==="AUTH_EXPIRED"&&session.refreshToken){try{const r=await refresh(session.refreshToken);const ns={...session,idToken:r.idToken,refreshToken:r.refreshToken};setSession(ns);localStorage.setItem("tal_session",JSON.stringify({refreshToken:r.refreshToken,email:session.email||""}));await load(ns)}catch(_){}}}finally{busy=false}};refreshData();const id=setInterval(refreshData,15000);const vis=()=>{if(document.visibilityState==="visible")refreshData()};document.addEventListener("visibilitychange",vis);return()=>{clearInterval(id);document.removeEventListener("visibilitychange",vis)}},[session,load]);
 useEffect(()=>{if(!session)return;let timer=null;const trigger=()=>{clearTimeout(timer);timer=setTimeout(()=>load(session).catch(()=>{}),100)};const stops=["attendance","employees","employeePhotos","locationIncidents","notifications"].map(path=>startFirebaseStream(path,session.idToken,trigger));return()=>{clearTimeout(timer);stops.forEach(fn=>fn&&fn())}},[session,load]);
 useEffect(()=>{if(!session?.uid)return;const e=employees.find(x=>String(x.id)===String(session.uid)||String(x.authUid||"")===String(session.uid)||(session.email&&String(x.email||"").toLowerCase()===String(session.email||"").toLowerCase()));if(e)setProfile(p=>({...p,...e,authUid:session.uid,photoData:photoOf(e)||photoOf(p)||""}))},[employees,session?.uid]);
