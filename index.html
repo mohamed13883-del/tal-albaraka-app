@@ -321,6 +321,11 @@ function Photo({value,className="profile-avatar",alt="صورة الموظف",emp
    for(const key of keys){
      try{const v=await fbGet(`employeePhotos/${encodeURIComponent(key)}`,token);const ph=photoOf(v);if(ph)return ph;}catch(e){}
    }
+   // أولاً: اقرأ ملف الموظف نفسه. في بعض الحسابات الصورة موجودة داخل employees
+   // بينما employeePhotos لا يحتوي نسخة قابلة للقراءة من حساب الموظف.
+   for(const key of keys){
+     try{const raw=await fbGet(`employees/${encodeURIComponent(key)}`,token);const ph=photoOf(raw);if(ph)return ph;}catch(e){}
+   }
    // احتياط للحسابات القديمة: إذا كانت الصورة محفوظة بمفتاح قديم غير موجود في بيانات الموظف، ابحث في سجل الصور نفسه.
    try{
      const all=await fbGet("employeePhotos",token);
@@ -1066,15 +1071,21 @@ const load=useCallback(async(s)=>{
     };
     hydrate().catch(()=>{});
    }else if(es){
+    // لا نستبدل الصورة التي تم العثور عليها أثناء تسجيل الدخول بملف UID الحالي إذا كان
+    // هذا الملف نسخة حديثة بلا صورة. نعيد حل هوية الموظف مرة واحدة ونأخذ الصورة من
+    // نفس المصدر الذي يستطيع حساب المشرف رؤيته.
     const prevProfile=profile||{};
-    const photoKeys=[s.uid,es?.id,es?.authUid,es?.employeeId,es?.legacyEmployeeId,prevProfile?.id,prevProfile?.authUid,prevProfile?.employeeId,prevProfile?.legacyEmployeeId,prevProfile?.employeeCode].filter((v,i,a)=>v&&a.indexOf(v)===i);
-    let resolvedPhoto=photoOf(es)||photoOf(prevProfile)||"";
+    let resolved=null;
+    try{resolved=await resolveEmployeeForAuth(s.uid,s.email||es?.email||"",t)}catch(e){}
+    const source=resolved||prevProfile||es||{};
+    const photoKeys=[s.uid,es?.id,es?.authUid,es?.employeeId,es?.legacyEmployeeId,source?.id,source?.authUid,source?.employeeId,source?.legacyEmployeeId,source?.employeeCode].filter((v,i,a)=>v&&a.indexOf(v)===i);
+    let resolvedPhoto=photoOf(es)||photoOf(source)||photoOf(prevProfile)||"";
     if(!resolvedPhoto){
       for(const key of photoKeys){try{const pv=await fbGet(`employeePhotos/${encodeURIComponent(key)}`,t);const ph=photoOf(pv);if(ph){resolvedPhoto=ph;break}}catch(e){}}
     }
-    const employee=normalizeEmployee(s.uid,{...prevProfile,...es,authUid:s.uid,legacyEmployeeId:es?.legacyEmployeeId||prevProfile?.legacyEmployeeId||((prevProfile?.id&&String(prevProfile.id)!==String(s.uid))?prevProfile.id:undefined),photoData:resolvedPhoto,profilePhoto:resolvedPhoto});
+    const employee=normalizeEmployee(source?.id||es?.id||s.uid,{...source,...es,authUid:s.uid,legacyEmployeeId:es?.legacyEmployeeId||source?.legacyEmployeeId||((source?.id&&String(source.id)!==String(s.uid))?source.id:undefined),photoData:resolvedPhoto,profilePhoto:resolvedPhoto,photo:resolvedPhoto,image:resolvedPhoto,avatar:resolvedPhoto});
     setEmployees([employee]);
-    setProfile(prev=>prev?{...prev,...employee,authUid:s.uid,legacyEmployeeId:employee.legacyEmployeeId||prev.legacyEmployeeId,photoData:resolvedPhoto||photoOf(prev)||"",profilePhoto:resolvedPhoto||photoOf(prev)||""}:employee);
+    setProfile(prev=>({...prev,...employee,authUid:s.uid,legacyEmployeeId:employee.legacyEmployeeId||prev?.legacyEmployeeId,photoData:resolvedPhoto||photoOf(prev)||"",profilePhoto:resolvedPhoto||photoOf(prev)||"",photo:resolvedPhoto||photoOf(prev)||"",image:resolvedPhoto||photoOf(prev)||"",avatar:resolvedPhoto||photoOf(prev)||""}));
    }
   setBranches(bs?Object.entries(bs).map(([id,v])=>({...DEFAULT_BRANCH,...v,id,radiusMeters:Math.max(10,Number(v.radiusMeters)||300),requiredHours:Math.max(0.25,Math.min(24,Number(v.requiredHours)||8)),graceMinutes:15})):[]);
   // الملف تم حله أثناء تسجيل الدخول/استعادة الجلسة؛ لا نعيد قراءة قاعدة الموظفين هنا.
