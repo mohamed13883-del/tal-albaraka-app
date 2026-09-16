@@ -311,7 +311,7 @@ function Card(p){return h("div",{className:`glass card3d rounded-2xl p-4 ${p.cla
 function Badge(p){const c={green:"text-emerald-300 bg-emerald-400/10",red:"text-red-300 bg-red-400/10",amber:"text-amber-300 bg-amber-400/10",blue:"text-sky-300 bg-sky-400/10",slate:"text-slate-300 bg-slate-400/10"}[p.tone||"slate"];return h("span",{className:`px-2.5 py-1 rounded-full text-xs font-semibold ${c}`},p.children)}
 function Logo(p){return h("img",{src:LOGO,alt:"تال البركة",className:`logo ${p.large?"w-28 h-28":"w-14 h-14"} rounded-full object-cover border border-white/10`})}
 function Icon(p){return h("span",{className:"w-9 h-9 rounded-xl bg-white/5 grid place-items-center text-lg"},p.children)}
-function Photo({value,className="profile-avatar",alt="صورة الموظف",employeeId,authUid,legacyId,employeeKey,userId,employeeCode,token}){const[src,setSrc]=useState(value||"");useEffect(()=>{let live=true;setSrc(value||"");if(!value&&token){const keys=[employeeId,authUid,legacyId,employeeKey,userId,employeeCode].filter((v,i,a)=>v&&a.indexOf(v)===i);(async()=>{for(const key of keys){if(!live)break;try{const e=await fbGet(`employees/${encodeURIComponent(key)}`,token);const p=photoOf(e);if(p){if(live)setSrc(p);break}}catch(e){}try{const v=await fbGet(`employeePhotos/${encodeURIComponent(key)}`,token);const p=photoOf(v);if(p){if(live)setSrc(p);break}}catch(e){}}})();}return()=>{live=false}},[value,employeeId,authUid,legacyId,employeeKey,userId,employeeCode,token]);if(!src)return h("div",{className:`${className} grid place-items-center bg-cyan-500/10`},"👤");return h("img",{src,alt,className,loading:"lazy",decoding:"async",onError:()=>setSrc("")});}
+function Photo({value,className="profile-avatar",alt="صورة الموظف",employeeId,token}){const[src,setSrc]=useState(value||"");useEffect(()=>{let live=true;setSrc(value||"");if(!value&&employeeId&&token){fbGet(`employeePhotos/${encodeURIComponent(employeeId)}`,token).then(v=>{if(live){const p=photoOf(v);if(p)setSrc(p)}}).catch(()=>{});}return()=>{live=false}},[value,employeeId,token]);if(!src)return h("div",{className:`${className} grid place-items-center bg-cyan-500/10`},"👤");return h("img",{src,alt,className,loading:"lazy",decoding:"async",onError:()=>setSrc("")});}
 function NotificationPanel({items=[],title="الإشعارات",onOpen}){
  const rows=(items||[]).slice(0,8);
  return h(Card,{className:"notification-panel"},[
@@ -530,7 +530,7 @@ function Employee({user,branch,branches,attendance,advances,leaves,payrollAdjust
   const stats=[h(Card,{key:"s1",className:"stat"},h("div",{className:"muted text-xs"},"إجمالي ساعات اليوم"),h("div",{className:"text-2xl font-black mt-1"},rec?formatHours(shiftMetrics(rec,branch).work):"0 دقيقة"),h("div",{className:"muted text-xs"},"المدة الفعلية")),h(Card,{key:"s2",className:"stat"},h("div",{className:"muted text-xs"},"الساعات الإضافية"),h("div",{className:"text-2xl font-black mt-1"},rec?formatHours(shiftMetrics(rec,branch).ot):"0 دقيقة"),h("div",{className:"muted text-xs"},"مدة إضافية")),h(Card,{key:"s3",className:"stat"},h("div",{className:"muted text-xs"},"أيام الحضور"),h("div",{className:"text-2xl font-black mt-1"},attendance.filter(a=>recordDate(a).slice(0,7)===monthKey(today())&&(a.checkInTime||a.checkIn||a.inTime||a.clockIn)).length)),h(Card,{key:"s4",className:"stat"},h("div",{className:"muted text-xs"},"آخر مسافة تم التحقق منها"),h("div",{className:"text-2xl font-black mt-1"},loc?.d!=null?`${loc.d} م`:"—"))];
   content=h(React.Fragment,null,
    
-   h("div",{className:"hero rounded-3xl p-5 flex flex-wrap justify-between items-center gap-5"},h("div",{className:"flex items-center gap-4"},h(Photo,{key:"employee-photo",value:photoOf(user),alt:user.name||"صورة الموظف",employeeId:user?.id,authUid:user?.authUid,legacyId:user?.legacyEmployeeId||user?.employeeId,employeeKey:user?.employeeKey||user?.legacyEmployeeId,userId:user?.userId,employeeCode:user?.employeeCode,token}),h("div",null,h("div",{className:"muted"},`مرحبًا ${user.name||""}`),h("div",{className:"text-3xl font-black mt-2"},rec?.checkOutTime?"تم تسجيل الانصراف":rec?.checkInTime?"أنت على رأس العمل":"جاهز لتسجيل حضورك؟"),h("div",{className:"muted mt-1"},`${branch.name} • ${branch.shiftStart} → ${branch.shiftEnd}`)))),
+   h("div",{className:"hero rounded-3xl p-5 flex flex-wrap justify-between items-center gap-5"},h("div",{className:"flex items-center gap-4"},h(Photo,{key:"employee-photo",value:photoOf(user),alt:user.name||"صورة الموظف",employeeId:user?.id,token}),h("div",null,h("div",{className:"muted"},`مرحبًا ${user.name||""}`),h("div",{className:"text-3xl font-black mt-2"},rec?.checkOutTime?"تم تسجيل الانصراف":rec?.checkInTime?"أنت على رأس العمل":"جاهز لتسجيل حضورك؟"),h("div",{className:"muted mt-1"},`${branch.name} • ${branch.shiftStart} → ${branch.shiftEnd}`)))),
    h("div",{className:"grid xl:grid-cols-[1.35fr_.65fr] gap-4"},h(Card,null,h("div",{className:"flex items-center justify-between gap-3"},h("div",null,h("div",{className:"text-xs muted"},"مراقبة الموقع المباشرة"),h("div",{className:"font-black text-lg"},branch.name)),h(Badge,{tone:"green",children:`نطاق ${Math.max(10,Number(branch.radiusMeters)||300)} متر`})),h(GPSMapPreview,{branch,distance:loc?.d,status:loc?.status==="checking"?"جاري التحقق من GPS…":loc?.blocked?"تم حظر الموقع غير الموثوق":loc?.d!=null?(loc.ok?`الموقع داخل النطاق • ${loc.d} متر`:`خارج النطاق • ${loc.d} متر`):"في انتظار تحديد موقع الموظف"})),h("div",null,stats)), 
    h(Card,null,h("div",{className:"flex flex-wrap justify-between items-center gap-3"},h("div",null,h("h2",{className:"font-black text-xl"},"حضور اليوم"),h("div",{className:"muted text-sm"},today())),h(Badge,{tone:rec?.checkOutTime?"green":rec?.checkInTime?"amber":"blue",children:rec?.checkOutTime?"تم الانصراف":rec?.checkInTime?"على رأس العمل":"لم يتم التحضير"})),
     h("div",{className:"grid sm:grid-cols-2 gap-3 mt-4"},h("div",{className:"pill rounded-2xl p-4"},h("div",{className:"muted text-xs"},"وقت التحضير"),h("div",{className:"text-2xl font-black"},rec?.checkInTime||"—"),h("div",{className:"muted text-xs"},rec?.checkInDistance!=null?`المسافة ${rec.checkInDistance} متر`:""),h("div",{className:"mt-2"},h(GeoIndicator,{distance:rec?.checkInDistance,branch,label:"نقطة التحضير"}))),h("div",{className:"pill rounded-2xl p-4"},h("div",{className:"muted text-xs"},"وقت الانصراف"),h("div",{className:"text-2xl font-black"},rec?.checkOutTime||"—"),h("div",{className:"muted text-xs"},rec?.checkOutDistance!=null?`المسافة ${rec.checkOutDistance} متر`:""),h("div",{className:"mt-2"},h(GeoIndicator,{distance:rec?.checkOutDistance,branch,label:"نقطة الانصراف"}))),
@@ -547,7 +547,7 @@ function Employee({user,branch,branches,attendance,advances,leaves,payrollAdjust
       ? h("div",{className:"pill rounded-2xl p-4 mb-3 border border-amber-300/20 bg-amber-400/10"},
           h("div",{className:"font-bold text-amber-200"},"لديك سلفة قائمة بالفعل"),
           h("div",{className:"muted text-sm mt-1"},blockingAdvance.status==="pending"
-            ? "تم تقديم طلب السلفة وهو قيد المراجعة. لا يمكن تقديم طلب جديد حتى يتم الرد عليه."
+            ? "تم تقديم طلب السلفة بنجاح، وهو الآن في انتظار رد المشرف. تم إرسال إشعار للمشرف، ولا يمكن تقديم طلب جديد حتى يتم الرد على الطلب."
             : "السلفة الحالية لم تُغلق بعد. لا يمكن تقديم طلب جديد حتى يتم سدادها وإغلاقها."))
       : h("div",{className:"space-y-3"},
           h("input",{className:"field",type:"number",min:"1",placeholder:"مبلغ السلفة",value:adv,onChange:e=>setAdv(e.target.value)}),
@@ -566,6 +566,7 @@ function Employee({user,branch,branches,attendance,advances,leaves,payrollAdjust
               h("div",null,
                 h("div",{className:"font-bold"},`سلفة ${money(a.amount)}`),
                 h("div",{className:"muted text-sm mt-1"},`الحالة: ${status} • المتبقي: ${money(rem)} ريال`),
+                a.status==="approved"&&h("div",{className:"text-sm text-emerald-300 mt-2 font-bold"},a.disbursementStatus==="sent"?"تمت الموافقة على السلفة وتم إرسالها للموظف.":"تمت الموافقة على السلفة."),
                 a.status==="rejected"&&a.rejectionReason?h("div",{className:"text-sm text-red-300 mt-2 font-bold"},`سبب الرفض: ${a.rejectionReason}`):null,
                 h("div",{className:"text-xs muted mt-1"},`الأقساط: ${a.installmentsCount||0} • القسط الحالي: ${money(a.installmentAmount||0)} • المسدد: ${money(a.paidAmount||0)} ريال`)
               ),
@@ -655,7 +656,7 @@ function AttendanceTable({attendance,employees,branches,onEdit,onSupervisorCheck
 function AttendanceEdit({record,employees,branches,onSave,onCancel}){const[f,setF]=useState({...record});const e=employees.find(x=>employeeMatchesRecord(x,f))||employees.find(x=>String(x.id)===String(f.employeeId));const b=recordBranch(f,e,branches);return h("div",{className:"fixed inset-0 bg-black/80 z-50 grid place-items-center p-4 overflow-auto"},h(Card,{className:"w-full max-w-2xl my-8"},h("div",{className:"flex justify-between items-center mb-4"},h("h3",{className:"font-black text-xl"},"تعديل التحضير والانصراف"),h(Badge,{tone:"amber",children:"للمشرف فقط"})),h("div",{className:"grid md:grid-cols-2 gap-3"},h("div",null,h("label",{className:"text-xs muted block mb-1"},"الموظف"),h("select",{className:"field",value:f.employeeId,onChange:x=>setF({...f,employeeId:x.target.value})},employees.filter(x=>x.role!=="admin").map(x=>h("option",{key:x.id,value:x.id},x.name)))),h("div",null,h("label",{className:"text-xs muted block mb-1"},"الفرع المستخدم في الحساب"),h("select",{className:"field",value:f.branchId||b.id,onChange:x=>{const nb=branches.find(q=>q.id===x.target.value)||DEFAULT_BRANCH;setF({...f,branchId:nb.id,branchName:nb.name,branchLat:nb.lat,branchLng:nb.lng,branchRadiusMeters:nb.radiusMeters,branchShiftStart:nb.shiftStart,branchShiftEnd:nb.shiftEnd,requiredHours:Math.max(0.25,Number(nb.requiredHours)||8),graceMinutes:Math.max(0,Number(nb.graceMinutes??15)||15)})}},branches.map(x=>h("option",{key:x.id,value:x.id},x.name)))),h("div",null,h("label",{className:"text-xs muted block mb-1"},"التاريخ"),h("input",{className:"field",type:"date",value:f.date||"",onChange:x=>setF({...f,date:x.target.value})})),h("div",null,h("label",{className:"text-xs muted block mb-1"},"وقت التحضير"),h("input",{className:"field",type:"time",value:f.checkInTime||"",onChange:x=>setF({...f,checkInTime:x.target.value})})),h("div",null,h("label",{className:"text-xs muted block mb-1"},"وقت الانصراف"),h("input",{className:"field",type:"time",value:f.checkOutTime||"",onChange:x=>setF({...f,checkOutTime:x.target.value})}))),h("div",{className:"pill rounded-xl p-3 mt-4 text-sm"},`الفرع: ${b.name} • ${b.shiftStart} → ${b.shiftEnd} • الموقع: ${Number(b.lat).toFixed(6)}, ${Number(b.lng).toFixed(6)} • نطاق ${Math.max(10,Number(b.radiusMeters)||300)} متر`),h("div",{className:"flex gap-2 mt-4"},h(Btn,{kind:"secondary",onClick:onCancel,children:"إلغاء"}),h(Btn,{onClick:()=>{const nb=recordBranch(f,e,branches);const m=shiftMetrics(f,nb);onSave({...f,_oldEmployeeId:record.employeeId,_oldDate:record.date,branchId:nb.id,branchName:nb.name,branchLat:nb.lat,branchLng:nb.lng,branchRadiusMeters:nb.radiusMeters,branchShiftStart:nb.shiftStart,branchShiftEnd:nb.shiftEnd,requiredHours:Math.max(0.25,Number(nb.requiredHours)||8),graceMinutes:Math.max(0,Number(nb.graceMinutes??f.graceMinutes??15)||15),workHours:m.work,overtimeHours:m.ot,overtimeBefore:m.otBefore,overtimeAfter:m.otAfter,verified:true})},children:"حفظ التعديل"}))));}
 function Decisions({title,items,employees,onDecision,kind}){
  const rows=items.map(x=>{const emp=employees.find(e=>employeeMatchesRecord(e,x));const desc=kind==="advance"?`سلفة ${money(x.amount)} • ${x.installmentsCount} أقساط`:kind==="settlement"?`طلب سداد ${money(x.settlementRequest?.amount)} • ${x.settlementRequest?.date||""}`:`${x.startDate} → ${x.endDate} • ${x.days} يوم`;
-  let actions=null;const rejectWithReason=(status)=>{const reason=window.prompt("اكتب سبب الرفض:","");if(reason===null)return;if(!String(reason).trim()){alert("يجب كتابة سبب الرفض.");return}onDecision(x,status,String(reason).trim())};if(kind==="settlement"&&x.settlementRequest?.status==="pending")actions=h("div",{className:"flex gap-2"},h(Btn,{onClick:()=>onDecision(x,"approvedSettlement"),children:"موافقة السداد"}),h(Btn,{kind:"danger",onClick:()=>rejectWithReason("rejectedSettlement"),children:"رفض السداد"}));else if(x.status==="pending")actions=h("div",{className:"flex gap-2"},h(Btn,{onClick:()=>onDecision(x,"approved"),children:"موافقة"}),h(Btn,{kind:"danger",onClick:()=>rejectWithReason("rejected"),children:"رفض"}));
+  let actions=null;const rejectWithReason=(status)=>{const reason=window.prompt("اكتب سبب الرفض:","");if(reason===null)return;if(!String(reason).trim()){alert("يجب كتابة سبب الرفض.");return}onDecision(x,status,String(reason).trim())};if(kind==="settlement"&&x.settlementRequest?.status==="pending")actions=h("div",{className:"flex gap-2"},h(Btn,{onClick:()=>onDecision(x,"approvedSettlement"),children:"موافقة السداد"}),h(Btn,{kind:"danger",onClick:()=>rejectWithReason("rejectedSettlement"),children:"رفض السداد"}));else if(x.status==="pending")actions=h("div",{className:"flex gap-2"},h(Btn,{onClick:()=>{if(kind==="advance"&&!window.confirm(`تأكيد الموافقة وإرسال السلفة بقيمة ${money(x.amount)} ريال للموظف؟`))return;onDecision(x,"approved")},children:kind==="advance"?"موافقة وإرسال السلفة":"موافقة"}),h(Btn,{kind:"danger",onClick:()=>rejectWithReason("rejected"),children:"رفض"}));
   return h("div",{id:`request-${kind}-${x.id}`,key:x.id,className:"pill rounded-2xl p-4 mb-2 flex flex-wrap justify-between gap-3"},h("div",null,h("div",{className:"font-bold"},emp?.name||x.employeeId),h("div",{className:"muted text-sm mt-1"},desc)),actions);
  });
  return h(Card,null,h("h3",{className:"font-black mb-3"},title),rows.length?rows:h("div",{className:"muted"},"لا توجد طلبات"));
@@ -684,6 +685,8 @@ function AdvanceManager({items,employees,onUpdate}){
       h("div",{className:"flex flex-wrap items-center gap-2"},h("div",{className:"font-bold truncate"},emp(a)?.name||a.employeeId),h(Badge,{tone:a.status==="approved"?"green":a.status==="pending"?"amber":a.status==="rejected"?"red":"blue",children:statusLabel(a)})),
       h("div",{className:"text-sm muted mt-1"},`السلفة الأصلية: ${money(a.amount)} • المتبقي: ${money(rem)}`),
       h("div",{className:"text-xs muted mt-1"},`الأقساط: ${a.installmentsCount||0} • القسط الحالي: ${money(a.installmentAmount||0)} • المتبقي: ${a.remainingInstallments||0}`),
+      a.status==="approved"&&h("div",{className:"text-xs text-emerald-300 mt-1"},a.disbursementStatus==="sent"?"تمت الموافقة وإرسال السلفة للموظف":"تمت الموافقة على السلفة"),
+      a.status==="rejected"&&a.rejectionReason&&h("div",{className:"text-xs text-red-300 mt-1"},`سبب الرفض: ${a.rejectionReason}`),
       h("div",{className:"text-xs text-emerald-300 mt-1"},`تم سداده: ${money(a.paidAmount||0)} ريال`),
       a.settlementRequest?.status?h("div",{className:"text-xs text-amber-200 mt-1"},`طلب السداد: ${a.settlementRequest.status==="pending"?"قيد المراجعة":a.settlementRequest.status==="approved"?"تمت الموافقة":"مرفوض"} • ${money(a.settlementRequest.amount||0)} ريال`):null
      ]),
@@ -916,7 +919,7 @@ async function repairEmployeePhotoRecord(id,raw,token,photoStore){
   const updatedAt=Date.now();
   try{await fbPut(`employeePhotos/${id}`,{photoData:photo,updatedAt,employeeId:id},token);}catch(e){}
   if(raw?.authUid && String(raw.authUid)!==String(id)){try{await fbPut(`employeePhotos/${raw.authUid}`,{photoData:photo,updatedAt,employeeId:id},token)}catch(e){}}
-  return {...raw,photoData:photo,profilePhoto:photo};
+  return {...raw,photoData:"",profilePhoto:""};
 }
 function flattenNotifications(obj){
   if(!obj) return [];
@@ -989,21 +992,6 @@ const load=useCallback(async(s)=>{
           if(r.status==="fulfilled"&&r.value) out.push(normalizeEmployee(id,r.value));
           else out.push(normalizeEmployee(id,es[id]||{}));
         });
-        // إصلاح جذري لصور الموظفين القديمة: الصورة يجب أن تكون داخل employees/{id}
-        // حتى يستطيع حساب الموظف قراءتها وفق صلاحياته، مع بقاء employeePhotos نسخة احتياطية.
-        await Promise.allSettled(batch.map(async id=>{
-          const current=out.find(x=>String(x.id)===String(id))||normalizeEmployee(id,es[id]||{});
-          if(photoOf(current)) return;
-          try{
-            const pv=await fbGet(`employeePhotos/${encodeURIComponent(id)}`,t);
-            const ph=photoOf(pv);
-            if(ph){
-              await fbPatch(`employees/${encodeURIComponent(id)}`,{photoData:ph},t);
-              const idx=out.findIndex(x=>String(x.id)===String(id));
-              if(idx>=0) out[idx]={...out[idx],photoData:ph,profilePhoto:ph};
-            }
-          }catch(e){}
-        }));
         setEmployees(prev=>{
           const map=new Map(prev.map(x=>[String(x.id),x]));
           out.slice(-batch.length).forEach(x=>map.set(String(x.id),x));
@@ -1015,14 +1003,7 @@ const load=useCallback(async(s)=>{
     hydrate().catch(()=>{});
    }else if(es)setEmployees([normalizeEmployee(s.uid,es)]);
   setBranches(bs?Object.entries(bs).map(([id,v])=>({...DEFAULT_BRANCH,...v,id,radiusMeters:Math.max(10,Number(v.radiusMeters)||300),requiredHours:Math.max(0.25,Math.min(24,Number(v.requiredHours)||8)),graceMinutes:15})):[]);
-  if(!isAdmin&&s?.uid){
-    const resolved=await resolveEmployeeForAuth(s.uid,s.email||"",t).catch(()=>null);
-    if(resolved){
-      const hydrated=normalizeEmployee(resolved.id,resolved);
-      setEmployees([hydrated]);
-      setProfile(prev=>({...prev,...hydrated,authUid:s.uid,photoData:photoOf(resolved)||photoOf(prev)||""}));
-    }
-  }
+  // الملف تم حله أثناء تسجيل الدخول/استعادة الجلسة؛ لا نعيد قراءة قاعدة الموظفين هنا.
   await loadNotifications(s);
 },[loadNotifications]);
 const loadHeavy=useCallback(async(s,section="all")=>{
@@ -1189,10 +1170,7 @@ const addAdvance=async({amount,installments})=>{
  const photo=photoField?(p.photoData||""):(photoOf(p)||photoOf(old)||"");
  const r={...p,authUid:p.authUid||old?.authUid||id,baseSalary:Number(p.baseSalary)||0,networkAmount:Number(p.networkAmount)||0};
  const photoKeys=["photoData","profilePhoto","photo","image","avatar","profilePicture","picture","imageData","photoURL","imageUrl","avatarUrl","profileImage","userPhoto","photoBase64","base64Photo"];
- // الصورة يجب أن تبقى أيضًا داخل ملف الموظف نفسه، لأن حساب الموظف يحتاج قراءتها مباشرة.
- // employeePhotos يبقى نسخة احتياطية/مخزنًا إضافيًا، لكن لا نعتمد عليه وحده.
- if(photo) r.photoData=photo;
- photoKeys.forEach(k=>{if(k!=="photoData")delete r[k]});
+ photoKeys.forEach(k=>delete r[k]);
  delete r.nationalId; delete r.bankAccount; delete r.iban; delete r.idNumber; delete r.__new; delete r.password;
  if(old&&old.branchId!==r.branchId)r.transferHistory=[...(old.transferHistory||[]),{date:today(),fromBranchId:old.branchId||"",toBranchId:r.branchId||"",by:profile?.name||"المشرف"}];
  await fbPatch(`employees/${id}`,r,session.idToken);
@@ -1281,11 +1259,14 @@ const manageAdvance=async(a,change)=>{const path=`advances/${a.employeeId}/${a.i
   if(st==="approved")Object.assign(patch,{remainingInstallments:0,remainingBalance:0,status:"closed",closedAt:Date.now(),closedBy:profile?.name||"المشرف"});await Promise.allSettled([r.employeeId,r.authUid,r.uid,r.userId].filter((v,i,arr)=>v&&arr.indexOf(v)===i).map(key=>fbPatch(`advances/${encodeURIComponent(key)}/${r.id}`,patch,session.idToken)));setAdvances(a=>a.map(x=>x.id===r.id?{...x,...patch}:x));
   try{const nid=uid();await notifyEmployee(r.employeeId,r.authUid,{id:nid,title:"تحديث طلب السداد",message:st==="approved"?"تمت الموافقة على طلب سداد المتبقي من السلفة.":`تم رفض طلب سداد المتبقي من السلفة. السبب: ${String(reason||"").trim()}`,type:"settlement",createdAt:Date.now(),read:false,requestId:r.id,payload:{requestId:r.id,id:r.id,rejectionReason:String(reason||"").trim()},status:st})}catch(e){}return;
  }
- const path=type==="leave"?"leaves":"advances",isRejected=status==="rejected",reasonText=String(reason||"").trim();const history=type==="advance"?[...(r.managementHistory||[]),{action:status==="approved"?"approved":"rejected",date:today(),by:profile?.name||"المشرف",amount:Number(r.amount)||0,...(isRejected?{reason:reasonText}: {})}]:null;const patch=type==="advance"?{status,managementHistory:history,...(isRejected?{rejectionReason:reasonText,rejectedAt:Date.now(),rejectedBy:profile?.name||"المشرف"}:{})}:{status,...(isRejected?{rejectionReason:reasonText,rejectedAt:Date.now(),rejectedBy:profile?.name||"المشرف"}:{})};
+ const path=type==="leave"?"leaves":"advances",isRejected=status==="rejected",reasonText=String(reason||"").trim();
+ if(isRejected&&!reasonText){alert("يجب كتابة سبب الرفض.");return;}
+ const history=type==="advance"?[...(r.managementHistory||[]),{action:status==="approved"?"approved":"rejected",date:today(),by:profile?.name||"المشرف",amount:Number(r.amount)||0,...(isRejected?{reason:reasonText}:{}),...(status==="approved"?{disbursementStatus:"sent"}:{})}]:null;
+ const patch=type==="advance"?{status,managementHistory:history,...(status==="approved"?{approvedAt:Date.now(),approvedBy:profile?.name||"المشرف",disbursementStatus:"sent",disbursementDate:today()}:{}),...(isRejected?{rejectionReason:reasonText,rejectedAt:Date.now(),rejectedBy:profile?.name||"المشرف"}:{})}:{status,...(isRejected?{rejectionReason:reasonText,rejectedAt:Date.now(),rejectedBy:profile?.name||"المشرف"}:{})};
  const keys=[r.employeeId,r.authUid,r.uid,r.userId].filter((v,i,arr)=>v&&arr.indexOf(v)===i);
  await Promise.allSettled(keys.map(key=>fbPatch(`${path}/${encodeURIComponent(key)}/${r.id}`,patch,session.idToken)));
  const set=type==="leave"?setLeaves:setAdvances;set(a=>a.map(x=>x.id===r.id?{...x,...patch}:x));
- try{const nid=uid(),msg=isRejected?`تم رفض طلب ${type==="advance"?"السلفة":"الإجازة"}. السبب: ${reasonText}`:`تمت الموافقة على طلب ${type==="advance"?"السلفة":"الإجازة"}.`;await notifyEmployee(r.employeeId,r.authUid,{id:nid,title:type==="leave"?"تحديث طلب الإجازة":"تحديث طلب السلفة",message:msg,type,createdAt:Date.now(),read:false,requestId:r.id,status,payload:{requestId:r.id,id:r.id,rejectionReason:reasonText}})}catch(e){}
+ try{const nid=uid(),msg=isRejected?`تم رفض طلب ${type==="advance"?"السلفة":"الإجازة"}. السبب: ${reasonText}`:(type==="advance"?"تمت الموافقة على السلفة وتم إرسالها لك. يمكنك متابعة الأقساط من صفحة السلف.":"تمت الموافقة على طلب الإجازة.");await notifyEmployee(r.employeeId,r.authUid,{id:nid,title:type==="leave"?"تحديث طلب الإجازة":"تحديث طلب السلفة",message:msg,type,createdAt:Date.now(),read:false,requestId:r.id,status,payload:{requestId:r.id,id:r.id,rejectionReason:reasonText}})}catch(e){}
 };;if(loading)return h("div",{className:"app-bg min-h-screen grid place-items-center p-6"},h("div",{className:"glass rounded-3xl p-7 text-center max-w-md w-full"},[h("div",{className:"w-full flex justify-center"},h(Logo,{large:true})),h("div",{className:"font-black text-xl mt-4"},"جاري تجهيز النظام…"),h("div",{className:"muted text-sm mt-2"},"يتم التحقق من الحساب وتحميل البيانات الأساسية."),h("div",{className:"mt-5 h-1.5 rounded-full bg-white/10 overflow-hidden"},h("div",{className:"h-full bg-cyan-400 rounded-full animate-pulse",style:{width:"62%"}}))]));if(!session)return h(Login,{onLogin:login});if(!profile)return h("div",{className:"app-bg min-h-screen grid place-items-center p-6"},h("div",{className:"glass rounded-3xl p-7 text-center max-w-md w-full"},h(Logo,{large:true}),h("div",{className:"font-black text-xl mt-4"},"جارٍ تجهيز الحساب…")));const adminRole=["admin","supervisor","manager"].includes(String(profile.role||session.role||"").toLowerCase());return adminRole?h(Admin,{profile,token:session.idToken,employees,branches,attendance,advances,leaves,locationIncidents,payrollAdjustments,onLogout:logout,onAddEmployee:addEmp,onUpdateEmployee:updateEmp,onDeactivate:deactivate,onSaveBranch:saveBranch,onAddBranch:addBranch,onDeleteBranch:deleteBranch,onDecision:(r,s)=>decision(r,s,"advance"),onLeaveDecision:(r,s)=>decision(r,s,"leave"),onUpdateAttendance:updateAttendance,onRepairPhotos:repairAllEmployeePhotos,onRepairAttendance:repairAttendanceHistory,onRepairPayroll:repairImportedPayroll,notifications,onNotificationOpen:openNotification,onManageAdvance:manageAdvance,onRestoreEmployee:restoreEmployee,onCleanupEmployeeData:cleanupEmployeeData,onClearCurrentArchive:clearCurrentArchive,onMigratePhotos:migratePhotosOutOfEmployees,onLoadSection:(section)=>loadHeavy(session,section),onSavePayrollAdjustment:savePayrollAdjustment,onSupervisorCheckout:supervisorCheckout}):h(Employee,{user:profile,branch,branches,attendance:attendance.filter(a=>employeeMatchesRecord(profile,a)),advances:advances.filter(a=>employeeMatchesRecord(profile,a)),leaves:leaves.filter(a=>employeeMatchesRecord(profile,a)),payrollAdjustment:payrollAdjustments.find(x=>employeeMatchesRecord(profile,x)&&String(x.month||"")===monthKey(today()))||null,notifications,onNotificationOpen:openNotification,onAttendance:addAttendance,onAdvance:addAdvance,onSettlement:addSettlement,onLeave:addLeave,onLogout:logout,token:session.idToken})}
 class AppErrorBoundary extends React.Component{
   constructor(props){super(props);this.state={error:null};}
