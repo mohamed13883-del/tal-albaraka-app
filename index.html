@@ -897,7 +897,7 @@ function Admin({profile,token,employees,branches,attendance,advances,leaves,loca
    h(Card,{className:"border border-cyan-400/20"},[
     h("div",{className:"flex flex-col lg:flex-row justify-between gap-4"},[
       h("div",null,h("div",{className:"flex items-center gap-2"},h("h2",{className:"font-black text-2xl"},"نظام السلف — الإصدار الجديد"),h(Badge,{tone:"green",children:"V2"})),h("div",{className:"muted text-sm mt-1"},"نظام مستقل عن بيانات السلف القديمة: طلب • موافقة/رفض • إشعار مباشر • أقساط • سداد مبكر • سجل حركة كامل.")),
-      h(Btn,{kind:"danger",onClick:onResetLegacyAdvances,children:"تهيئة وحذف بيانات السلف القديمة"})
+      null
     ]),
     h("div",{className:"grid grid-cols-2 md:grid-cols-4 gap-3 mt-4"},[["طلبات معلقة",pending.length],["سلف نشطة",activeAdv.length],["طلبات سداد",pendingSettlements.length],["مغلقة/مرفوضة",closed.length+rejected.length]].map(x=>h("div",{key:x[0],className:"stat rounded-2xl p-3"},h("div",{className:"muted text-xs"},x[0]),h("div",{className:"text-2xl font-black mt-1"},x[1]))))
    ]),
@@ -1344,7 +1344,7 @@ const addAdvance=async({amount,installments})=>{
  const r={id,employeeId:canonicalId,authUid,employeeName:profile?.name||"",employeeEmail:profile?.email||session.email||"",advanceId:id,systemVersion:ADVANCE_SYSTEM_VERSION,amount:numericAmount,installmentsCount:n,installmentAmount:Math.round(numericAmount/n*100)/100,remainingInstallments:n,remainingBalance:numericAmount,paidAmount:0,status:"pending",requestDate,createdAt:Date.now(),managementHistory:[{action:"request",date:requestDate,by:profile?.name||"الموظف",amount:numericAmount,installments:n}]};
  const keys=[canonicalId,session.uid,authUid].filter((v,i,arr)=>v&&arr.indexOf(v)===i);
  const writes=await Promise.allSettled(keys.map(key=>fbPut(`${ADVANCE_STORE}/${encodeURIComponent(key)}/${id}`,{...r,employeeId:key,authUid},session.idToken)));
- if(!writes.some(x=>x.status==="fulfilled")){alert("تعذر حفظ طلب السلفة. لم يتم تسجيل الطلب، حاول مرة أخرى.");return false;}
+ if(!writes.some(x=>x.status==="fulfilled")){console.error("Advance save failed: all storage writes were rejected");return false;}
  try{await fbPut(`${ADVANCE_REQUEST_STORE}/${encodeURIComponent(id)}`,r,session.idToken);}catch(_){ }
  setAdvances(a=>[...a.filter(x=>String(x.id)!==String(id)),r]);
  await notifySupervisors("advance",{employeeName:r.employeeName,amount:numericAmount,installments:n,requestDate,id,requestId:id,employeeId:canonicalId,authUid});
