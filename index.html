@@ -71,6 +71,60 @@ table{border-spacing:0 6px}th{color:#82a9c0!important;text-transform:none}td{bac
 
 @media (max-width:640px){.btn3d{padding:.52rem .72rem !important;font-size:.78rem !important;border-radius:.7rem !important}.field{padding:9px 10px;font-size:.9rem}.pill .btn3d{white-space:nowrap}}
 .employee-actions{gap:.35rem !important}.employee-actions .btn3d{padding:.42rem .62rem !important;font-size:.72rem !important;border-radius:.65rem !important}
+</style><style id="mobile-only-final-fix">
+/* هذا المشروع مخصص للجوال فقط: ضبط العرض والمحاذاة بدون تغيير الهوية البصرية. */
+html,body{width:100%;max-width:100%;overflow-x:hidden}
+body{margin:0;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+*{box-sizing:border-box}
+.page-shell{width:100%!important;max-width:600px!important;margin:0 auto!important;padding:8px!important}
+.content-wrap{width:100%!important;min-width:0!important}
+.app-layout{display:flex!important;flex-direction:column!important;width:100%!important;gap:9px!important}
+.app-layout>main{width:100%!important;min-width:0!important}
+.side-nav{position:sticky!important;top:4px!important;z-index:40!important;width:100%!important;max-width:100%!important;overflow-x:auto!important;display:flex!important;align-items:stretch!important;gap:5px!important;padding:6px!important;scrollbar-width:none}
+.side-nav::-webkit-scrollbar{display:none}
+.side-nav>div:first-child{display:none!important}
+.side-nav button{flex:0 0 auto!important;width:auto!important;min-width:92px!important;min-height:42px!important;margin:0!important;padding:7px 9px!important;font-size:12px!important;justify-content:center!important;white-space:nowrap!important}
+.side-nav button .w-9{width:28px!important;height:28px!important;font-size:14px!important}
+header{width:100%!important;margin-bottom:8px!important;padding:9px 10px!important;min-height:58px!important;gap:7px!important;flex-wrap:wrap!important}
+header .logo{width:40px!important;height:40px!important}
+.hero{padding:12px!important}
+.card3d,.glass{max-width:100%!important}
+.stat{min-width:0!important;min-height:76px!important;padding:10px!important}
+.field{width:100%!important;min-height:42px!important;padding:9px 10px!important;font-size:13px!important}
+button.btn3d{padding:8px 10px!important;font-size:12px!important;min-height:38px!important}
+.notification-panel{padding:8px!important;margin-bottom:8px!important}
+.notification-panel .pill{padding:7px 8px!important}
+.notification-panel .font-black.text-lg{font-size:.9rem!important}
+.notification-panel .font-bold{font-size:.82rem!important}
+.notification-panel .text-sm{font-size:.7rem!important;line-height:1.3!important}
+.notification-panel .text-\[10px\]{font-size:7px!important}
+.notification-panel .space-y-2>*+*{margin-top:.3rem!important}
+.report-shell{width:100%!important;max-width:100%!important;padding:0!important}
+.report-head{gap:7px!important}
+.report-head>div{max-width:100%!important}
+.report-head .flex{gap:5px!important;flex-wrap:wrap!important}
+.report-grid{width:100%!important;max-width:100%!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;border-radius:12px}
+.report-grid table{min-width:980px!important;font-size:11px!important}
+.report-grid th,.report-grid td{padding:8px 7px!important;white-space:nowrap!important}
+/* جداول الحضور والرواتب تبقى قابلة للسحب أفقيًا بدل كسر الصفحة على شاشة الهاتف. */
+.overflow-auto{max-width:100%!important;-webkit-overflow-scrolling:touch!important}
+.overflow-auto table{font-size:11px!important}
+.overflow-auto th,.overflow-auto td{padding:8px 7px!important;white-space:nowrap!important}
+/* بطاقات الموظفين والسلف والإجازات تكون عمودية ومضبوطة على الهاتف. */
+.employee-actions{flex-wrap:wrap!important;gap:5px!important}
+.employee-actions .btn3d{padding:7px 9px!important;font-size:11px!important}
+.grid{min-width:0!important}
+img{max-width:100%}
+.fixed.inset-0{padding:8px!important}
+.fixed.inset-0>.w-full{max-width:100%!important;margin:8px auto!important}
+@media(max-width:380px){
+ .page-shell{padding:5px!important}
+ .side-nav button{min-width:82px!important;padding:6px 7px!important;font-size:11px!important}
+ .notification-panel .text-sm{font-size:.67rem!important}
+ .stat{padding:9px!important}
+ .text-3xl{font-size:1.45rem!important}
+ .text-2xl{font-size:1.2rem!important}
+}
 </style></head><body><div id="root"><div style="min-height:100vh;background:#04111f;color:#eef7ff;display:grid;place-items:center;padding:24px;font-family:Tahoma,Arial,sans-serif;direction:rtl"><div style="max-width:420px;width:100%;background:#071b2c;border:1px solid rgba(56,189,248,.25);border-radius:24px;padding:28px;text-align:center"><div style="font-size:26px;font-weight:900">تال البركة</div><div style="margin-top:10px;color:#8ea9bd">جاري تشغيل النظام…</div><div id="boot-error" style="display:none;margin-top:18px;color:#fca5a5;font-size:13px">تعذر تشغيل واجهة النظام. حدّث الصفحة مرة أخرى.</div></div></div></div><script>window.addEventListener("error",function(e){var x=document.getElementById("boot-error");if(x)x.style.display="block";});window.addEventListener("unhandledrejection",function(){var x=document.getElementById("boot-error");if(x)x.style.display="block";});</script><script id="src">
 
 
@@ -214,7 +268,8 @@ function flatten(obj) {
 }
 const DEFAULT_BRANCH = { id: "main", name: "الفرع الرئيسي", lat: 21.4858, lng: 39.1925, radiusMeters: 300, shiftStart: "09:00", shiftEnd: "17:00", graceMinutes: 15, requiredHours: 8, monthlyWorkDays: 26, weeklyOffDays: 4, reminderBeforeStart: 30, reminderBeforeEnd: 15 };
 const ADMIN_PERMISSION_LIST = [["employees","الموظفون"],["branches","الفروع"],["attendance","الحضور والانصراف"],["advances","السلف"],["leaves","الإجازات"],["reports","التقارير"],["settings","الإعدادات"]];
-function hasPerm(profile,key){return !!profile && profile.role==="admin" && (!profile.permissions || profile.permissions[key]!==false)}
+const isManagementRole = role => ["admin","supervisor","manager"].includes(String(role||"").toLowerCase());
+function hasPerm(profile,key){return !!profile && isManagementRole(profile.role) && (!profile.permissions || profile.permissions[key]!==false)}
 const DEFAULT_COMPANY = { companyName: "Tal Al Baraka" };
 const PERMS = ["employees", "branches", "attendance", "advances", "leaves", "reports", "settings"];
 
@@ -316,7 +371,8 @@ function recordBranch(a,e,branches){
     graceMinutes:a?.graceMinutes??base.graceMinutes
   };
 }
-function employeeMatchesRecord(e,r){const norm=v=>String(v??"").trim().toLowerCase().replace(/\s+/g," ");const ids=[e?.id,e?.uid,e?.authUid,e?.userId,e?.employeeId,e?.employeeCode,e?.pdfNo,e?.email].filter(v=>v!==undefined&&v!==null&&String(v)!=="").map(String);const rids=[r?.employeeId,r?.uid,r?.userId,r?.authUid,r?.employeeCode,r?.pdfNo,r?.email].filter(v=>v!==undefined&&v!==null&&String(v)!=="").map(String);if(rids.some(x=>ids.includes(x)))return true;const ee=norm(e?.email),re=norm(r?.email);if(ee&&re&&ee===re)return true;const en=norm(e?.name||e?.fullName||e?.employeeName),rn=norm(r?.employeeName||r?.name||r?.fullName);return !!(en&&rn&&en===rn);}
+function normalizeArabicText(v){return String(v??"").trim().toLowerCase().replace(/[ًٌٍَُِّْـ]/g,"").replace(/[أإآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/ؤ/g,"و").replace(/ئ/g,"ي").replace(/\s+/g," ");}
+function employeeMatchesRecord(e,r){const norm=v=>normalizeArabicText(v);const ids=[e?.id,e?.uid,e?.authUid,e?.userId,e?.employeeId,e?.employeeCode,e?.pdfNo,e?.email].filter(v=>v!==undefined&&v!==null&&String(v)!=="").map(String);const rids=[r?.employeeId,r?.uid,r?.userId,r?.authUid,r?.employeeCode,r?.pdfNo,r?.email].filter(v=>v!==undefined&&v!==null&&String(v)!=="").map(String);if(rids.some(x=>ids.includes(x)))return true;const ee=norm(e?.email),re=norm(r?.email);if(ee&&re&&ee===re)return true;const en=norm(e?.name||e?.fullName||e?.employeeName),rn=norm(r?.employeeName||r?.name||r?.fullName);return !!(en&&rn&&en===rn);}
 function payrollFor(e,records,advances,month,currentBranch,payrollAdjustment){
   const baseSalary=salaryOf(e), defaultHours=Math.max(0.25,Number(e?.requiredHours)||Number(currentBranch?.requiredHours)||Number(records?.find(x=>x?.branch?.requiredHours||x?.requiredHours)?.branch?.requiredHours||records?.find(x=>x?.requiredHours)?.requiredHours)||8);
   let regular=0,ot=0,work=0,days=0,earnedBasic=0,overtimeValue=0;
@@ -324,7 +380,10 @@ function payrollFor(e,records,advances,month,currentBranch,payrollAdjustment){
   (records||[]).filter(Boolean).forEach(r=>{
     const d=recordDate(r), key=d;
     const hasIn=!!(r.checkInTime||r.checkIn||r.inTime||r.clockIn);
-    if(hasIn&&d) {
+    const storedWorkForMatch=Math.max(0,toNum(r.workHours??r.totalWorkHours??r.hoursWorked??r.workedHours??r.totalHours));
+    // بعض السجلات القديمة تحفظ عدد الساعات فقط بدون وقت التحضير؛ لا نهملها من الراتب.
+    const hasAttendance=hasIn||storedWorkForMatch>0||!!r.checkOutTime;
+    if(hasAttendance&&d) {
       const prev=unique.get(key);
       const score=x=>(x.checkOutTime?8:0)+(x.checkInTime?4:0)+(toNum(x.workHours)>0?2:0);
       if(!prev||score(r)>score(prev))unique.set(key,r);
@@ -423,7 +482,7 @@ function Employee({user,branch,branches,attendance,advances,leaves,payrollAdjust
  if(tab==="salary")content=h(Salary,{user,attendance:attendance.map(a=>({...a,branch:recordBranch(a,user,branches||[branch])})),advances,branch,payrollAdjustment});
  return h("div",{className:"page-shell"},camera&&h(Selfie,{label:camera==="in"?"صورة سيلفي للتحضير":"صورة سيلفي للانصراف",onCancel:()=>{setCamera(null);setLoc(null)},onDone:capture}),h(Header,{profile:user,onLogout}),h("div",{className:"app-layout"},h(SideNav,{active:tab,onChange:setTab,items:[["home","الرئيسية","⌂"],["profile","ملفي","👤"],["advances","السلف","💰"],["leaves","الإجازات","🗓"],["salary","الراتب","▣"]]}),h("main",{className:"space-y-5 content-wrap"},h(NotificationPanel,{items:notifications,title:"إشعارات الموظف",onOpen:onNotificationOpen}),content)),settle&&h(SettlementModal,{advance:settle,onCancel:()=>setSettle(null),onSend:x=>{onSettlement(settle,x);setSettle(null)}}))
 }
-function Salary({user,attendance,advances,branch,payrollAdjustment}){const month=monthKey(today()),monthAttendance=(attendance||[]).filter(a=>recordDate(a).slice(0,7)===month).map(a=>({...a,branch:a.branch||recordBranch(a,user,branch?.id?[branch]:[])||branch})),r=payrollFor(user,monthAttendance,advances,month,branch);return h(Card,null,h("div",{className:"flex items-center justify-between mb-4"},h("div",null,h("h2",{className:"font-black text-xl"},"ملخص الراتب"),h("div",{className:"muted text-sm"},"حسب ساعات الحضور الفعلية والإضافي"),h("div",{className:"text-xs text-emerald-300 mt-1"},"● تحديث مباشر من سجلات الحضور والانصراف")),h(Badge,{tone:"blue",children:`26 يوم × ${Math.max(0.25,Number(branch?.requiredHours)||8)} ساعات`})),h("div",{className:"grid sm:grid-cols-2 lg:grid-cols-4 gap-3"},[["الراتب الأساسي",money(r.baseSalary),"ريال"],["المستحق الأساسي حتى الآن",money(r.earnedBasic),"ريال"],["أيام الحضور المعتمدة",String(r.approvedDays),"يوم"],["ساعات العمل",formatHours(r.regular),"ساعة"],["ساعات إضافية",formatHours(r.ot),"ساعة"],["قيمة الإضافي",money(r.overtimeValue),"ريال"],["إجمالي المستحق",money(r.gross),"ريال"],["صافي الراتب",money(r.net),"ريال"]].map(x=>h("div",{key:x[0],className:"stat rounded-2xl p-4"},h("div",{className:"muted text-xs"},x[0]),h("div",{className:"text-2xl font-black mt-1"},x[1]),h("div",{className:"muted text-xs"},x[2])))),h("div",{className:"grid sm:grid-cols-3 gap-3 mt-4"},h("div",{className:"stat rounded-xl p-3"},h("div",{className:"muted text-xs"},"أقساط السلف"),h("div",{className:"font-black text-lg"},money(r.installment))),h("div",{className:"stat rounded-xl p-3"},h("div",{className:"muted text-xs"},"سداد السلفة"),h("div",{className:"font-black text-lg"},money(r.settlement))),h("div",{className:"stat rounded-xl p-3"},h("div",{className:"muted text-xs"},"السلف"),h("div",{className:"font-black text-lg"},money(r.deductions)))),h("div",{className:"muted text-sm mt-4"},`الشهر: ${month} • أيام العمل المعتمدة: ${r.approvedDays} من 26 • أيام إضافية معتمدة: ${r.additionalDays} • ساعات العمل المطلوبة حسب الفرع: ${Math.max(0.25,Number(branch?.requiredHours)||8)} ساعة • معادلة الساعة: الراتب الأساسي ÷ 26 ÷ ساعات العمل المطلوبة = ${money(r.hourly)} ريال.`))}
+function Salary({user,attendance,advances,branch,payrollAdjustment}){const month=monthKey(today()),monthAttendance=(attendance||[]).filter(a=>recordDate(a).slice(0,7)===month).map(a=>({...a,branch:a.branch||recordBranch(a,user,branch?.id?[branch]:[])||branch})),r=payrollFor(user,monthAttendance,advances,month,branch,payrollAdjustment);return h(Card,null,h("div",{className:"flex items-center justify-between mb-4"},h("div",null,h("h2",{className:"font-black text-xl"},"ملخص الراتب"),h("div",{className:"muted text-sm"},"حسب ساعات الحضور الفعلية والإضافي"),h("div",{className:"text-xs text-emerald-300 mt-1"},"● تحديث مباشر من سجلات الحضور والانصراف")),h(Badge,{tone:"blue",children:`26 يوم × ${Math.max(0.25,Number(branch?.requiredHours)||8)} ساعات`})),h("div",{className:"grid sm:grid-cols-2 lg:grid-cols-4 gap-3"},[["الراتب الأساسي",money(r.baseSalary),"ريال"],["المستحق الأساسي حتى الآن",money(r.earnedBasic),"ريال"],["أيام الحضور المعتمدة",String(r.approvedDays),"يوم"],["ساعات العمل",formatHours(r.regular),"ساعة"],["ساعات إضافية",formatHours(r.ot),"ساعة"],["قيمة الإضافي",money(r.overtimeValue),"ريال"],["إجمالي المستحق",money(r.gross),"ريال"],["صافي الراتب",money(r.net),"ريال"]].map(x=>h("div",{key:x[0],className:"stat rounded-2xl p-4"},h("div",{className:"muted text-xs"},x[0]),h("div",{className:"text-2xl font-black mt-1"},x[1]),h("div",{className:"muted text-xs"},x[2])))),h("div",{className:"grid sm:grid-cols-3 gap-3 mt-4"},h("div",{className:"stat rounded-xl p-3"},h("div",{className:"muted text-xs"},"أقساط السلف"),h("div",{className:"font-black text-lg"},money(r.installment))),h("div",{className:"stat rounded-xl p-3"},h("div",{className:"muted text-xs"},"سداد السلفة"),h("div",{className:"font-black text-lg"},money(r.settlement))),h("div",{className:"stat rounded-xl p-3"},h("div",{className:"muted text-xs"},"السلف"),h("div",{className:"font-black text-lg"},money(r.deductions)))),h("div",{className:"muted text-sm mt-4"},`الشهر: ${month} • أيام العمل المعتمدة: ${r.approvedDays} من 26 • أيام إضافية معتمدة: ${r.additionalDays} • ساعات العمل المطلوبة حسب الفرع: ${Math.max(0.25,Number(branch?.requiredHours)||8)} ساعة • معادلة الساعة: الراتب الأساسي ÷ 26 ÷ ساعات العمل المطلوبة = ${money(r.hourly)} ريال.`))}
 function BranchForm({branch,onSave,onCancel}){const[f,setF]=useState({...DEFAULT_BRANCH,...branch,requiredHours:Math.max(0.25,Math.min(24,Number(branch.requiredHours??8)||8)),reminderBeforeStart:Number(branch.reminderBeforeStart??30),reminderBeforeEnd:Number(branch.reminderBeforeEnd??15)});const ch=(k,v)=>{let z=v;if(["lat","lng","radiusMeters","requiredHours"].includes(k))z=Number(v);if(k==="requiredHours")z=Math.max(0.25,Math.min(24,Number(v)||8));if(k==="radiusMeters")z=Math.max(10,Math.min(5000,Number(v)||300));setF({...f,[k]:z})};return h(Card,null,h("h3",{className:"font-black mb-3"},"إعدادات الفرع"),h("div",{className:"pill rounded-xl p-3 mb-3 text-sm border border-cyan-400/20"},"نطاق الحضور والانصراف يُطبق على التحضير والانصراف معًا، ويمكن للمشرف تغييره لكل فرع من هنا."),h("div",{className:"grid sm:grid-cols-2 gap-3"},h("input",{className:"field",placeholder:"اسم الفرع",value:f.name,onChange:e=>ch("name",e.target.value)}),h("input",{className:"field",type:"number",placeholder:"نطاق الحضور والانصراف بالمتر",value:f.radiusMeters,onChange:e=>ch("radiusMeters",e.target.value)}),h("input",{className:"field",type:"number",step:"any",placeholder:"خط العرض",value:f.lat,onChange:e=>ch("lat",e.target.value)}),h("input",{className:"field",type:"number",step:"any",placeholder:"خط الطول",value:f.lng,onChange:e=>ch("lng",e.target.value)}),h("input",{className:"field",type:"time",value:f.shiftStart,onChange:e=>ch("shiftStart",e.target.value)}),h("input",{className:"field",type:"time",value:f.shiftEnd,onChange:e=>ch("shiftEnd",e.target.value)}),h("input",{className:"field",type:"number",min:"0.25",max:"24",step:"0.25",value:f.requiredHours,onChange:e=>ch("requiredHours",e.target.value),placeholder:"عدد ساعات العمل المطلوبة"}),h("input",{className:"field",type:"number",min:"5",max:"180",value:f.reminderBeforeStart,onChange:e=>ch("reminderBeforeStart",Math.max(5,Math.min(180,Number(e.target.value)||30))),placeholder:"تذكير التحضير قبل الدوام بالدقائق"}),h("input",{className:"field",type:"number",min:"5",max:"180",value:f.reminderBeforeEnd,onChange:e=>ch("reminderBeforeEnd",Math.max(5,Math.min(180,Number(e.target.value)||15))),placeholder:"تذكير الانصراف قبل نهاية الدوام بالدقائق"})),h(GPSMapPreview,{branch:{...f},status:`موقع الفرع • ${Number(f.lat||0).toFixed(6)}, ${Number(f.lng||0).toFixed(6)}`}),h("div",{className:"text-xs muted mt-3"},`ساعات العمل المطلوبة ${Math.max(0.25,Number(f.requiredHours)||8)} ساعة • السماح 15 دقيقة لا يخصم من الراتب • نطاق GPS قابل للتعديل من المشرف (10 إلى 5000 متر).`),branch.needsLocationSetup&&h("div",{className:"mt-3 rounded-xl p-3 bg-amber-400/10 border border-amber-400/20 text-amber-200 text-sm"},"هذا الفرع تم إنشاؤه من ملف PDF ويحتاج من المشرف استكمال موقع الفرع قبل السماح بالحضور عليه."),h("div",{className:"flex gap-2 mt-4"},onCancel&&h(Btn,{kind:"secondary",onClick:onCancel,children:"إلغاء"}),h(Btn,{onClick:()=>onSave({...f,radiusMeters:Math.max(10,Math.min(5000,Number(f.radiusMeters)||300)),requiredHours:Math.max(0.25,Math.min(24,Number(f.requiredHours)||8)),graceMinutes:15}),children:"حفظ إعدادات الفرع"}))) }
 function PhotoField({value,onChange}){const ref=useRef();const pick=e=>{const f=e.target.files?.[0];if(!f)return;if(!f.type.startsWith("image/"))return;const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const max=320,scale=Math.min(1,max/Math.max(img.width,img.height)),w=Math.max(1,Math.round(img.width*scale)),hgt=Math.max(1,Math.round(img.height*scale));const c=document.createElement("canvas");c.width=w;c.height=hgt;const ctx=c.getContext("2d");ctx.drawImage(img,0,0,w,hgt);onChange(c.toDataURL("image/jpeg",0.62))};img.onerror=()=>onChange(r.result);img.src=r.result};r.readAsDataURL(f)};return h("div",{className:"photo-upload"},value?h("img",{src:value,className:"profile-avatar",alt:"صورة الموظف",onError:e=>{e.currentTarget.style.display="none"}}):h("div",{className:"profile-avatar grid place-items-center bg-white/5"},"👤"),h("div",{className:"flex-1"},h("div",{className:"font-bold"},"صورة الموظف"),h("div",{className:"muted text-xs mt-1"},"يتم حفظ الصورة مضغوطة وربطها مباشرة بملف وحساب الموظف."),h("input",{ref,type:"file",accept:"image/*",onChange:pick,className:"field mt-2"}),value&&h(Btn,{kind:"secondary",onClick:()=>onChange(""),children:"إزالة الصورة"})))}
 function EditEmployee({employee,branches,onSave,onCancel,isNew=false}){
@@ -541,7 +600,7 @@ function AdvanceManager({items,employees,onUpdate}){
 }
 function attendanceForEmployee(e,attendance){
   const list=attendance||[];
-  const norm=v=>String(v??"").trim().toLowerCase().replace(/\s+/g," ");
+  const norm=v=>normalizeArabicText(v);
   const ids=[e?.id,e?.uid,e?.authUid,e?.userId,e?.employeeId,e?.employeeCode,e?.pdfNo].filter(v=>v!==undefined&&v!==null&&String(v)!=="").map(String);
   const email=norm(e?.email), name=norm(e?.name||e?.fullName||e?.employeeName);
   return list.filter(a=>{
@@ -603,7 +662,7 @@ function Admin({profile,token,employees,branches,attendance,advances,leaves,loca
   ]);
  }
  if(tab==="employees"){
-  const admins=employees.filter(e=>e.role==="admin"&&e.active!==false);
+  const admins=employees.filter(e=>isManagementRole(e.role)&&e.active!==false);
   const save=()=>{if(!newE.name||!newE.email||!newE.password)return;if(newE.password.length<6)return;if(accountType==="employee"&&!newE.branchId)return;onAddEmployee(accountType==="admin"?{name:newE.name,email:newE.email,password:newE.password,role:"admin",permissions:adminPerms}:{...newE,role:"employee"});setNewE({name:"",email:"",password:"",baseSalary:"",paymentMethod:"cash",networkAmount:"",branchId:branches[0]?.id||"",photoData:""});setAdminPerms(Object.fromEntries(ADMIN_PERMISSION_LIST.map(x=>[x[0],true])))};
   const list=active.map(e=>h("div",{key:e.id,className:"pill rounded-xl p-3 mb-2 flex items-center justify-between gap-3"},[h("div",{className:"flex items-center gap-3"},h(Photo,{value:photoOf(e),employeeId:e.id,token,className:"profile-avatar"}),h("div",null,[h("div",{className:"font-bold"},e.name),h("div",{className:"muted text-xs"},`${branches.find(b=>b.id===e.branchId)?.name||"بدون فرع"} • ${money(e.baseSalary)} ريال • ${e.paymentMethod==="split"?"شبكة ثابتة + نقدي":e.paymentMethod==="bank"?"شبكة":"نقدي"}`),null])),h("div",{className:"employee-actions flex gap-2"},[h(Btn,{kind:"secondary",onClick:()=>setEditEmployee(e),children:"تعديل"}),h(Btn,{kind:"danger",onClick:()=>onDeactivate(e.id),children:"إيقاف ونقل للأرشيف"})])])) ;
   const adminList=admins.map(e=>h("div",{key:e.id,className:"pill rounded-xl p-3 mb-2 flex justify-between gap-3"},[h("div",null,[h("div",{className:"font-bold"},e.name),h("div",{className:"muted text-xs"},"حساب مشرف • لا يمكن تعطيله نهائيًا")]),h(Badge,{tone:"green",children:"حساب إداري محمي"})]));
@@ -745,7 +804,7 @@ function App(){const[session,setSession]=useState(null),[profile,setProfile]=use
 },[profile?.id]);
 const load=useCallback(async(s)=>{
   const t=tokenOf(s);
-  const isAdmin=s?.role==="admin";
+  const isAdmin=isManagementRole(s?.role);
   const core=await Promise.allSettled([
     isAdmin?fbGetShallow("employees",t):fbGet(`employees/${encodeURIComponent(s?.uid||"")}`,t),
     fbGet("branches",t)
@@ -783,7 +842,7 @@ const load=useCallback(async(s)=>{
 },[loadNotifications]);
 const loadHeavy=useCallback(async(s,section="all")=>{
   const t=tokenOf(s);
-  const isAdmin=s?.role==="admin";
+  const isAdmin=isManagementRole(s?.role);
   const empKeys=[s?.uid,profile?.id].filter((v,i,a)=>v&&a.indexOf(v)===i).map(encodeURIComponent);
   if(isAdmin){
     // المشرف لا يحمّل كل البيانات الثقيلة عند تسجيل الدخول. يتم تحميل كل قسم عند فتحه فقط.
@@ -854,9 +913,9 @@ useEffect(()=>{(async()=>{
   }catch(e){}
   setLoading(false);
 })()},[load]);
-useEffect(()=>{if(!session)return;let busy=false;const refreshData=async()=>{if(busy)return;busy=true;try{await loadHeavy(session,session.role==="admin"?"none":"all");await loadNotifications(session)}catch(e){if(e?.message==="AUTH_EXPIRED"&&session.refreshToken){try{const r=await refresh(session.refreshToken);const ns={...session,idToken:r.idToken,refreshToken:r.refreshToken,uid:session.uid,email:session.email,role:session.role};setSession(ns);localStorage.setItem("tal_session",JSON.stringify({refreshToken:r.refreshToken,email:session.email||"",role:session.role||"employee"}));await load(ns);await loadHeavy(ns,ns.role==="admin"?"none":"all");await loadNotifications(ns)}catch(_){}}}finally{busy=false}};refreshData();const id=setInterval(refreshData,30000);const vis=()=>{if(document.visibilityState==="visible")refreshData()};document.addEventListener("visibilitychange",vis);return()=>{clearInterval(id);document.removeEventListener("visibilitychange",vis)}},[session,load,loadHeavy]);
-useEffect(()=>{if(!session)return;let timer=null;const trigger=()=>{clearTimeout(timer);timer=setTimeout(()=>loadNotifications(session).catch(()=>{}),180)};const pkey=profile?.id;const employeePath=profile?.role==="admin"?"employees":`employees/${encodeURIComponent(pkey||session.uid)}`;const notificationPaths=[`notifications/${encodeURIComponent(session.uid)}`];if(pkey&&String(pkey)!==String(session.uid))notificationPaths.push(`notifications/${encodeURIComponent(pkey)}`);const stops=[employeePath,...notificationPaths].map(path=>startFirebaseStream(path,session.idToken,trigger));return()=>{clearTimeout(timer);stops.forEach(fn=>fn&&fn())}},[session,load,profile?.role,profile?.id]);
-useEffect(()=>{if(!session?.uid)return;const e=session.role==="admin"?employees.find(x=>String(x.id)===String(session.uid)||String(x.authUid||"")===String(session.uid)):employees.find(x=>String(x.id)===String(session.uid)||String(x.authUid||"")===String(session.uid)||(session.email&&String(x.email||"").toLowerCase()===String(session.email||"").toLowerCase()));if(e){const isAdminSession=String(session.role||"").toLowerCase()==="admin"||String(session.role||"").toLowerCase()==="supervisor"||String(session.role||"").toLowerCase()==="manager";if(isAdminSession&&!(["admin","supervisor","manager"].includes(String(e.role||"").toLowerCase())))return;setProfile(p=>({...p,...e,role:isAdminSession?(p?.role||session.role):e.role,authUid:session.uid,photoData:photoOf(e)||photoOf(p)||""}))}},[employees,session?.uid]);
+useEffect(()=>{if(!session)return;let busy=false;const refreshData=async()=>{if(busy)return;busy=true;try{await loadHeavy(session,isManagementRole(session.role)?"none":"all");await loadNotifications(session)}catch(e){if(e?.message==="AUTH_EXPIRED"&&session.refreshToken){try{const r=await refresh(session.refreshToken);const ns={...session,idToken:r.idToken,refreshToken:r.refreshToken,uid:session.uid,email:session.email,role:session.role};setSession(ns);localStorage.setItem("tal_session",JSON.stringify({refreshToken:r.refreshToken,email:session.email||"",role:session.role||"employee"}));await load(ns);await loadHeavy(ns,isManagementRole(ns.role)?"none":"all");await loadNotifications(ns)}catch(_){}}}finally{busy=false}};refreshData();const id=setInterval(refreshData,30000);const vis=()=>{if(document.visibilityState==="visible")refreshData()};document.addEventListener("visibilitychange",vis);return()=>{clearInterval(id);document.removeEventListener("visibilitychange",vis)}},[session,load,loadHeavy]);
+useEffect(()=>{if(!session)return;let timer=null;const trigger=()=>{clearTimeout(timer);timer=setTimeout(()=>loadNotifications(session).catch(()=>{}),180)};const pkey=profile?.id;const employeePath=isManagementRole(profile?.role)?"employees":`employees/${encodeURIComponent(pkey||session.uid)}`;const notificationPaths=[`notifications/${encodeURIComponent(session.uid)}`];if(pkey&&String(pkey)!==String(session.uid))notificationPaths.push(`notifications/${encodeURIComponent(pkey)}`);const stops=[employeePath,...notificationPaths].map(path=>startFirebaseStream(path,session.idToken,trigger));return()=>{clearTimeout(timer);stops.forEach(fn=>fn&&fn())}},[session,load,profile?.role,profile?.id]);
+useEffect(()=>{if(!session?.uid)return;const e=isManagementRole(session.role)?employees.find(x=>String(x.id)===String(session.uid)||String(x.authUid||"")===String(session.uid)):employees.find(x=>String(x.id)===String(session.uid)||String(x.authUid||"")===String(session.uid)||(session.email&&String(x.email||"").toLowerCase()===String(session.email||"").toLowerCase()));if(e){const isAdminSession=String(session.role||"").toLowerCase()==="admin"||String(session.role||"").toLowerCase()==="supervisor"||String(session.role||"").toLowerCase()==="manager";if(isAdminSession&&!(["admin","supervisor","manager"].includes(String(e.role||"").toLowerCase())))return;setProfile(p=>({...p,...e,role:isAdminSession?(p?.role||session.role):e.role,authUid:session.uid,photoData:photoOf(e)||photoOf(p)||""}))}},[employees,session?.uid]);
 const logout=()=>{setSession(null);setProfile(null);localStorage.removeItem("tal_session")};const branch=branches.find(b=>b.id===profile?.branchId)||branches[0]||DEFAULT_BRANCH;const addAttendance=async({type,selfie,distance,lat,lng,securityEvent,securityReason,accuracy,locationTimestamp})=>{
  const date=today(),stamp=now(),activeBranch=branches.find(b=>b.id===profile?.branchId)||branch;
  if(securityEvent){
@@ -864,7 +923,7 @@ const logout=()=>{setSession(null);setProfile(null);localStorage.removeItem("tal
    const incident={id:incidentId,employeeId:session.uid,authUid:session.uid,email:profile?.email||session.email||"",employeeName:profile?.name||"",type:type==="in"?"تحضير":"انصراف",date,time:stamp,reason:securityReason||"موقع غير موثوق",distance:Number(distance)||0,lat:Number(lat)||0,lng:Number(lng)||0,accuracy:Number(accuracy)||0,locationTimestamp:locationTimestamp||Date.now(),branchId:activeBranch?.id||"",branchName:activeBranch?.name||"",status:"blocked",message:"تم حظر العملية بسبب استخدام/اشتباه موقع وهمي. يمنع استخدام Mock Location.",createdAt:Date.now()};
    try{await fbPut(`locationIncidents/${session.uid}/${incidentId}`,incident,session.idToken);setLocationIncidents(x=>[incident,...x]);}catch(e){try{await fbPut(`attendanceSecurity/${session.uid}/${incidentId}`,incident,session.idToken)}catch(_){}}
    try{await fbPatch(`employees/${session.uid}`,{locationBlocked:true,locationBlockedAt:Date.now(),locationBlockReason:incident.reason},session.idToken)}catch(e){}
-   try{for(const a of employees.filter(x=>x.role==="admin"&&x.active!==false)){const nid=uid();await fbPut(`notifications/${a.id}/${nid}`,{id:nid,title:"محاولة موقع غير موثوق",message:`تم حظر ${incident.employeeName||"موظف"} عند تسجيل ${incident.type}. تم تسجيل الواقعة وإيقاف الحضور للحساب.`,type:"location_security",createdAt:Date.now(),read:false,payload:incident},session.idToken)}}catch(e){}
+   try{for(const a of employees.filter(x=>isManagementRole(x.role)&&x.active!==false)){const nid=uid();await fbPut(`notifications/${a.id}/${nid}`,{id:nid,title:"محاولة موقع غير موثوق",message:`تم حظر ${incident.employeeName||"موظف"} عند تسجيل ${incident.type}. تم تسجيل الواقعة وإيقاف الحضور للحساب.`,type:"location_security",createdAt:Date.now(),read:false,payload:incident},session.idToken)}}catch(e){}
    return false;
  }
  if(!activeBranch?.id||!Number.isFinite(Number(distance))){alert("لا يمكن تسجيل الحضور أو الانصراف بدون تحقق موقع صحيح.");return false;}
