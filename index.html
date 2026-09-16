@@ -311,7 +311,7 @@ function Card(p){return h("div",{className:`glass card3d rounded-2xl p-4 ${p.cla
 function Badge(p){const c={green:"text-emerald-300 bg-emerald-400/10",red:"text-red-300 bg-red-400/10",amber:"text-amber-300 bg-amber-400/10",blue:"text-sky-300 bg-sky-400/10",slate:"text-slate-300 bg-slate-400/10"}[p.tone||"slate"];return h("span",{className:`px-2.5 py-1 rounded-full text-xs font-semibold ${c}`},p.children)}
 function Logo(p){return h("img",{src:LOGO,alt:"تال البركة",className:`logo ${p.large?"w-28 h-28":"w-14 h-14"} rounded-full object-cover border border-white/10`})}
 function Icon(p){return h("span",{className:"w-9 h-9 rounded-xl bg-white/5 grid place-items-center text-lg"},p.children)}
-function Photo({value,className="profile-avatar",alt="صورة الموظف",employeeId,authUid,token,legacyId,employeeKey}){const[src,setSrc]=useState(value||"");useEffect(()=>{let live=true;setSrc(value||"");if(!value&&token){const keys=[employeeId,authUid,legacyId,employeeKey].filter((v,i,a)=>v&&a.indexOf(v)===i);(async()=>{for(const key of keys){try{const v=await fbGet(`employeePhotos/${encodeURIComponent(key)}`,token);const p=photoOf(v);if(p){if(live)setSrc(p);return;}}catch(e){}}})();}return()=>{live=false}},[value,employeeId,authUid,legacyId,employeeKey,token]);if(!src)return h("div",{className:`${className} grid place-items-center bg-cyan-500/10`},"👤");return h("img",{src,alt,className,loading:"lazy",decoding:"async",onError:()=>setSrc("")});}
+function Photo({value,className="profile-avatar",alt="صورة الموظف",employeeId,authUid,token,legacyId,employeeKey,userId,employeeCode}){const[src,setSrc]=useState(value||"");useEffect(()=>{let live=true;setSrc(value||"");if(!value&&token){const keys=[employeeId,authUid,legacyId,employeeKey,userId,employeeCode].filter((v,i,a)=>v&&a.indexOf(v)===i);(async()=>{for(const key of keys){try{const v=await fbGet(`employeePhotos/${encodeURIComponent(key)}`,token);const p=photoOf(v);if(p){if(live)setSrc(p);return;}}catch(e){}}})();}return()=>{live=false}},[value,employeeId,authUid,legacyId,employeeKey,userId,employeeCode,token]);if(!src)return h("div",{className:`${className} grid place-items-center bg-cyan-500/10`},"👤");return h("img",{src,alt,className,loading:"lazy",decoding:"async",onError:()=>setSrc("")});}
 function NotificationPanel({items=[],title="الإشعارات",onOpen}){
  const rows=(items||[]).slice(0,8);
  return h(Card,{className:"notification-panel"},[
@@ -327,7 +327,7 @@ function NotificationPanel({items=[],title="الإشعارات",onOpen}){
   ))) : h("div",{className:"muted text-sm"},"ستظهر هنا طلبات الإجازات والسلف والتنبيهات وتذكيرات الدوام.")
  ]);
 }
-function Header({profile,onLogout,token}){return h("header",{className:"glass rounded-2xl px-4 py-3 mb-5 flex items-center justify-between"},h("div",{className:"text-right"},h("div",{className:"font-black text-xl"},"لوحة التحكم"),h("div",{className:"text-xs muted"},profile?.role==="admin"?"إدارة الموظفين والفروع والرواتب":"ملف الموظف والحضور والراتب"),h("div",{className:"text-[9px] text-emerald-300 mt-1"},"LIVE • 2026.09.15")),h("div",{className:"flex items-center gap-3"},h(Photo,{value:photoOf(profile),employeeId:profile?.id,authUid:profile?.authUid,token}),h("div",{className:"hidden sm:block text-right"},h("div",{className:"font-bold"},profile?.name),h("div",{className:"text-xs muted"},profile?.role==="admin"?"المشرف":"الموظف")),h("button",{onClick:onLogout,className:"pill rounded-xl px-3 py-2 text-xs"},"تسجيل الخروج")))}
+function Header({profile,onLogout,token}){return h("header",{className:"glass rounded-2xl px-4 py-3 mb-5 flex items-center justify-between"},h("div",{className:"text-right"},h("div",{className:"font-black text-xl"},"لوحة التحكم"),h("div",{className:"text-xs muted"},profile?.role==="admin"?"إدارة الموظفين والفروع والرواتب":"ملف الموظف والحضور والراتب"),h("div",{className:"text-[9px] text-emerald-300 mt-1"},"LIVE • 2026.09.15")),h("div",{className:"flex items-center gap-3"},h(Photo,{value:photoOf(profile),employeeId:profile?.id,authUid:profile?.authUid,legacyId:profile?.legacyEmployeeId,employeeKey:profile?.employeeKey,userId:profile?.userId,employeeCode:profile?.employeeCode,token}),h("div",{className:"hidden sm:block text-right"},h("div",{className:"font-bold"},profile?.name),h("div",{className:"text-xs muted"},profile?.role==="admin"?"المشرف":"الموظف")),h("button",{onClick:onLogout,className:"pill rounded-xl px-3 py-2 text-xs"},"تسجيل الخروج")))}
 function SideNav({items,active,onChange}){return h("aside",{className:"side-nav glass rounded-3xl p-3"},h("div",{className:"flex flex-col items-center py-4 border-b border-white/10 mb-3"},h("div",{className:"font-black text-xl"},"تال البركة"),h("div",{className:"muted text-xs mt-1"},"لوحة التحكم")),items.map(x=>h("button",{key:x[0],onClick:()=>onChange(x[0]),className:`navitem w-full flex items-center gap-3 rounded-xl px-3 py-3 mb-1 text-sm ${active===x[0]?"navactive":""}`},h(Icon,null,x[2]),h("span",null,x[1]))))}
 function Selfie({onDone,onCancel,label}){const ref=useRef(),stream=useRef(),[ready,setReady]=useState(false),[err,setErr]=useState("");useEffect(()=>{let live=true;navigator.mediaDevices?.getUserMedia({video:{facingMode:{ideal:"user"},width:{ideal:720},height:{ideal:720}},audio:false}).then(s=>{if(!live)return;stream.current=s;if(ref.current){ref.current.srcObject=s;ref.current.play();setReady(true)}}).catch(()=>setErr("يجب السماح للكاميرا لإتمام العملية."));return()=>{live=false;stream.current?.getTracks().forEach(t=>t.stop())}},[]);const snap=()=>{const v=ref.current;if(!v?.videoWidth)return;const c=document.createElement("canvas"),size=420;c.width=c.height=size;const min=Math.min(v.videoWidth,v.videoHeight);c.getContext("2d").drawImage(v,(v.videoWidth-min)/2,(v.videoHeight-min)/2,min,min,0,0,size,size);const data=c.toDataURL("image/jpeg",.76);stream.current?.getTracks().forEach(t=>t.stop());onDone(data)};return h("div",{className:"fixed inset-0 bg-black/85 z-50 grid place-items-center p-4"},h(Card,{className:"w-full max-w-md"},h("div",{className:"font-bold mb-3"},label),err?h("div",{className:"text-red-300 text-sm py-14 text-center"},err):h("video",{ref,muted:true,playsInline:true,className:"w-full aspect-square object-cover rounded-2xl bg-black",style:{transform:"scaleX(-1)"}}),h("div",{className:"flex gap-2 mt-4"},h(Btn,{kind:"secondary",onClick:onCancel,children:"إلغاء"}),h(Btn,{disabled:!ready,onClick:snap,children:"التقاط سيلفي"}))))}
 function Login({onLogin}){const[e,setE]=useState(""),[p,setP]=useState(""),[busy,setBusy]=useState(false),[err,setErr]=useState("");const go=async()=>{if(!e||!p){setErr("أدخل اسم المستخدم وكلمة المرور.");return}setBusy(true);setErr("");try{await onLogin(e,p)}catch(x){setErr(x.message)}finally{setBusy(false)}};return h("div",{className:"min-h-screen app-bg grid place-items-center p-5"},h(Card,{className:"w-full max-w-md text-center mx-auto"},h("div",{className:"flex flex-col items-center justify-center"},h(Logo,{large:true}),h("h1",{className:"text-3xl font-black mt-4"},"تال البركة"),h("p",{className:"muted mt-1 mb-6"},"نظام الحضور والرواتب")),h("div",{className:"space-y-3 text-right"},h("label",{className:"text-sm font-bold block"},"اسم المستخدم"),h("input",{className:"field",dir:"ltr",placeholder:"البريد الإلكتروني",value:e,onChange:x=>setE(x.target.value)}),h("label",{className:"text-sm font-bold block mt-3"},"كلمة المرور"),h("input",{className:"field",dir:"ltr",type:"password",placeholder:"كلمة المرور",value:p,onChange:x=>setP(x.target.value)}),err&&h("div",{className:"text-red-300 text-sm"},err),h(Btn,{disabled:busy,onClick:go,children:busy?"جارٍ تسجيل الدخول…":"تسجيل الدخول"}))))}
@@ -349,53 +349,60 @@ function locationIntegrity(position){
 function locationWarningText(reasons){return 'تم إيقاف العملية: تم اكتشاف موقع غير موثوق أو موقع وهمي. يمنع استخدام Mock Location أو أي تطبيق لتغيير الموقع. سيتم إبلاغ المشرف وتسجيل الواقعة. '+(reasons||[]).join(' • ')}
 function shiftMetrics(rec,branch){
   if(!rec)return{work:0,regular:0,otBefore:0,otAfter:0,ot:0};
-  const ci=minutes(rec.checkInTime||rec.checkIn||rec.inTime||rec.clockIn), storedWork=Math.max(0,toNum(rec.workHours??rec.totalWorkHours??rec.hoursWorked??rec.workedHours??rec.totalHours)), storedOt=Math.max(0,toNum(rec.overtimeHours??rec.otHours??rec.overtime??rec.extraHours));
+  const ciRaw=minutes(rec.checkInTime||rec.checkIn||rec.inTime||rec.clockIn);
+  const storedWork=Math.max(0,toNum(rec.workHours??rec.totalWorkHours??rec.hoursWorked??rec.workedHours??rec.totalHours));
+  const storedOt=Math.max(0,toNum(rec.overtimeHours??rec.otHours??rec.overtime??rec.extraHours));
   const date=String(rec.date||rec.day||rec.attendanceDate||"");
   const isToday=date===today();
-  let co=minutes(rec.checkOutTime||rec.checkOut||rec.outTime||rec.clockOut);
-  if(co==null && isToday && ci!=null) co=minutes(now());
-  if(ci==null || co==null || co<ci){
+  let coRaw=minutes(rec.checkOutTime||rec.checkOut||rec.outTime||rec.clockOut);
+  if(coRaw==null && isToday && ciRaw!=null)coRaw=minutes(now());
+  const ssRaw=minutes(branch?.shiftStart||rec.branchShiftStart||"09:00");
+  const seRaw=minutes(branch?.shiftEnd||rec.branchShiftEnd||"17:00");
+  if(ciRaw==null||ssRaw==null||seRaw==null){
     if(storedWork>0){
-      // لا يوجد إضافي قبل إتمام ساعات العمل المطلوبة كاملة.
       const requiredHours=Math.max(0.25,Number(branch?.requiredHours??rec.requiredHours??8)||8);
-      const regular=Math.min(requiredHours,Math.max(0,storedWork));
-      const ot=Math.max(0,storedWork-requiredHours);
+      const regular=Math.min(requiredHours,storedWork);
+      const ot=Math.max(0,storedOt||storedWork-requiredHours);
       return{work:storedWork,regular,otBefore:0,otAfter:ot,ot};
     }
     return{work:0,regular:0,otBefore:0,otAfter:0,ot:0};
   }
-  let ss=minutes(branch?.shiftStart||rec.branchShiftStart||"09:00"),se=minutes(branch?.shiftEnd||rec.branchShiftEnd||"17:00");
-  if(ss==null||se==null)return{work:0,regular:0,otBefore:0,otAfter:0,ot:0};
-  // دعم الورديات التي تتجاوز منتصف الليل.
-  // مثال: 15:30 → 02:00 تعني أن 02:00 في اليوم التالي (26:00 حسابيًا).
-  if(se<=ss)se+=1440;
-  let endMinutes=co;
-  // إذا كان الانصراف بعد منتصف الليل فحوّله إلى نفس خط زمني ليوم التحضير.
-  if(endMinutes<ci)endMinutes+=1440;
-  co=endMinutes;
-  if(co<ci)return{work:0,regular:0,otBefore:0,otAfter:0,ot:0};
+
+  // نستخدم خطًا زمنيًا واحدًا للوردية. إذا كانت نهاية الفرع أصغر أو مساوية للبداية
+  // فهذا يعني أن الوردية تتجاوز منتصف الليل، مثل 15:30 → 02:00.
+  const ss=ssRaw;
+  const se=seRaw<=ssRaw?seRaw+1440:seRaw;
+  const ci=ciRaw;
+  let co=coRaw;
+  if(co!=null && co<ci)co+=1440;
+
+  // مهم: لا نرفض co<ci قبل تحويل الانصراف لليوم التالي.
+  if(co==null||co<ci){
+    if(storedWork>0){
+      const requiredHours=Math.max(0.25,Number(branch?.requiredHours??rec.requiredHours??8)||8);
+      const regular=Math.min(requiredHours,storedWork);
+      const ot=Math.max(0,storedOt||storedWork-requiredHours);
+      return{work:storedWork,regular,otBefore:0,otAfter:ot,ot};
+    }
+    return{work:0,regular:0,otBefore:0,otAfter:0,ot:0};
+  }
+
+  // إذا كان الانصراف 02:00 مع وردية 15:30 → 23:30، يصبح 26:00 على نفس الخط الزمني.
+  // وإذا كان الحضور نفسه بعد منتصف الليل لوردية ليلية، نرفع زمن الحضور أيضًا عند الحاجة.
+  let ciLine=ci;
+  if(se>1440 && ciLine<ss && ciLine<se-1440)ciLine+=1440;
+  if(co<ciLine)co+=1440;
+
   const requiredHours=Math.max(0.25,Number(branch?.requiredHours??rec.requiredHours??8)||8);
   const grace=Math.max(0,Number(branch?.graceMinutes??rec.graceMinutes??15)||0);
-  // ساعات العمل المطلوبة يحددها المشرف لكل فرع، ويمكن تغييرها في رمضان أو أي فترة أخرى.
-  // وقت التحضير المحفوظ يظل هو الوقت الفعلي للموظف، لكن التأخير حتى مدة السماح لا يخصم من الراتب.
-  // مثال: بداية الفرع 09:00، حضر 09:10 => يُحسب له 8 ساعات كاملة إذا انصرف 17:00.
-  const paidCi=(ci>ss && ci<=ss+grace)?ss:ci;
-  const work=Math.max(0,(co-ci)/60);
-  if(work<=0 && storedWork>0){
-    const requiredHours=Math.max(0.25,Number(branch?.requiredHours??rec.requiredHours??8)||8);
-    const regular=Math.min(requiredHours,storedWork);
-    const ot=Math.max(0,storedWork-requiredHours);
-    return{work:storedWork,regular,otBefore:0,otAfter:ot,ot};
-  }
+  // السماح لا يغيّر وقت الحضور المحفوظ، ولا يخصم من الأجر.
+  const paidCi=(ciLine>ss && ciLine<=ss+grace)?ss:ciLine;
+  const work=Math.max(0,(co-ciLine)/60);
   const paidWork=Math.max(0,(co-paidCi)/60);
-  // الإضافي لا يبدأ إلا بعد إتمام عدد ساعات العمل الذي حدده المشرف للفرع.
-  const regular=Math.min(requiredHours,Math.max(0,paidWork));
+  // الراتب الأساسي يعتمد على الساعات المطلوبة الفعلية للفرع، والإضافي يبدأ بعد إكمالها.
+  const regular=Math.min(requiredHours,paidWork);
   const ot=Math.max(0,paidWork-requiredHours);
-  // لا نعتبر وقت ما قبل بداية الفرع إضافيًا قبل اكتمال الساعات المطلوبة.
-  // بعد اكتمال الساعات الثماني يظهر الإضافي في خانة ما بعد الدوام.
-  const before=0;
-  const after=ot;
-  return{work,regular,otBefore:before,otAfter:after,ot};
+  return{work,regular,otBefore:0,otAfter:ot,ot};
 }
 function recordBranch(a,e,branches){
   const list=branches||[];
@@ -518,7 +525,7 @@ function Employee({user,branch,branches,attendance,advances,leaves,payrollAdjust
   const stats=[h(Card,{key:"s1",className:"stat"},h("div",{className:"muted text-xs"},"إجمالي ساعات اليوم"),h("div",{className:"text-2xl font-black mt-1"},rec?formatHours(shiftMetrics(rec,branch).work):"0 دقيقة"),h("div",{className:"muted text-xs"},"المدة الفعلية")),h(Card,{key:"s2",className:"stat"},h("div",{className:"muted text-xs"},"الساعات الإضافية"),h("div",{className:"text-2xl font-black mt-1"},rec?formatHours(shiftMetrics(rec,branch).ot):"0 دقيقة"),h("div",{className:"muted text-xs"},"مدة إضافية")),h(Card,{key:"s3",className:"stat"},h("div",{className:"muted text-xs"},"أيام الحضور"),h("div",{className:"text-2xl font-black mt-1"},attendance.filter(a=>recordDate(a).slice(0,7)===monthKey(today())&&(a.checkInTime||a.checkIn||a.inTime||a.clockIn)).length)),h(Card,{key:"s4",className:"stat"},h("div",{className:"muted text-xs"},"آخر مسافة تم التحقق منها"),h("div",{className:"text-2xl font-black mt-1"},loc?.d!=null?`${loc.d} م`:"—"))];
   content=h(React.Fragment,null,
    
-   h("div",{className:"hero rounded-3xl p-5 flex flex-wrap justify-between items-center gap-5"},h("div",{className:"flex items-center gap-4"},h(Photo,{key:"employee-photo",value:photoOf(user),employeeId:user?.id,authUid:user?.authUid,token,alt:user.name||"صورة الموظف"}),h("div",null,h("div",{className:"muted"},`مرحبًا ${user.name||""}`),h("div",{className:"text-3xl font-black mt-2"},rec?.checkOutTime?"تم تسجيل الانصراف":rec?.checkInTime?"أنت على رأس العمل":"جاهز لتسجيل حضورك؟"),h("div",{className:"muted mt-1"},`${branch.name} • ${branch.shiftStart} → ${branch.shiftEnd}`)))),
+   h("div",{className:"hero rounded-3xl p-5 flex flex-wrap justify-between items-center gap-5"},h("div",{className:"flex items-center gap-4"},h(Photo,{key:"employee-photo",value:photoOf(user),employeeId:user?.id,authUid:user?.authUid,legacyId:user?.legacyEmployeeId,employeeKey:user?.employeeKey,userId:user?.userId,employeeCode:user?.employeeCode,token,alt:user.name||"صورة الموظف"}),h("div",null,h("div",{className:"muted"},`مرحبًا ${user.name||""}`),h("div",{className:"text-3xl font-black mt-2"},rec?.checkOutTime?"تم تسجيل الانصراف":rec?.checkInTime?"أنت على رأس العمل":"جاهز لتسجيل حضورك؟"),h("div",{className:"muted mt-1"},`${branch.name} • ${branch.shiftStart} → ${branch.shiftEnd}`)))),
    h("div",{className:"grid xl:grid-cols-[1.35fr_.65fr] gap-4"},h(Card,null,h("div",{className:"flex items-center justify-between gap-3"},h("div",null,h("div",{className:"text-xs muted"},"مراقبة الموقع المباشرة"),h("div",{className:"font-black text-lg"},branch.name)),h(Badge,{tone:"green",children:`نطاق ${Math.max(10,Number(branch.radiusMeters)||300)} متر`})),h(GPSMapPreview,{branch,distance:loc?.d,status:loc?.status==="checking"?"جاري التحقق من GPS…":loc?.blocked?"تم حظر الموقع غير الموثوق":loc?.d!=null?(loc.ok?`الموقع داخل النطاق • ${loc.d} متر`:`خارج النطاق • ${loc.d} متر`):"في انتظار تحديد موقع الموظف"})),h("div",null,stats)), 
    h(Card,null,h("div",{className:"flex flex-wrap justify-between items-center gap-3"},h("div",null,h("h2",{className:"font-black text-xl"},"حضور اليوم"),h("div",{className:"muted text-sm"},today())),h(Badge,{tone:rec?.checkOutTime?"green":rec?.checkInTime?"amber":"blue",children:rec?.checkOutTime?"تم الانصراف":rec?.checkInTime?"على رأس العمل":"لم يتم التحضير"})),
     h("div",{className:"grid sm:grid-cols-2 gap-3 mt-4"},h("div",{className:"pill rounded-2xl p-4"},h("div",{className:"muted text-xs"},"وقت التحضير"),h("div",{className:"text-2xl font-black"},rec?.checkInTime||"—"),h("div",{className:"muted text-xs"},rec?.checkInDistance!=null?`المسافة ${rec.checkInDistance} متر`:""),h("div",{className:"mt-2"},h(GeoIndicator,{distance:rec?.checkInDistance,branch,label:"نقطة التحضير"}))),h("div",{className:"pill rounded-2xl p-4"},h("div",{className:"muted text-xs"},"وقت الانصراف"),h("div",{className:"text-2xl font-black"},rec?.checkOutTime||"—"),h("div",{className:"muted text-xs"},rec?.checkOutDistance!=null?`المسافة ${rec.checkOutDistance} متر`:""),h("div",{className:"mt-2"},h(GeoIndicator,{distance:rec?.checkOutDistance,branch,label:"نقطة الانصراف"}))),
@@ -581,7 +588,7 @@ function Employee({user,branch,branches,attendance,advances,leaves,payrollAdjust
  if(tab==="leaves"){
   content=h(Card,null,h("h2",{className:"font-black text-xl mb-3"},"طلبات الإجازات"),h("div",{className:"grid sm:grid-cols-2 gap-3"},h("select",{className:"field",value:leave.type,onChange:e=>setLeave({...leave,type:e.target.value})},h("option",{value:"annual"},"سنوية"),h("option",{value:"sick"},"مرضية"),h("option",{value:"casual"},"عارضة")),h("input",{className:"field",type:"date",value:leave.start,onChange:e=>setLeave({...leave,start:e.target.value})}),h("input",{className:"field",type:"date",value:leave.end,onChange:e=>setLeave({...leave,end:e.target.value})}),h("input",{className:"field sm:col-span-2",placeholder:"السبب",value:leave.reason,onChange:e=>setLeave({...leave,reason:e.target.value})}),h(Btn,{onClick:()=>onLeave({...leave,days:daysBetween(leave.start,leave.end),requestDate:today()}),children:"إرسال طلب الإجازة"})),h("div",{className:"mt-4"},leaves.map(x=>h("div",{id:`request-leave-${x.id}`,key:x.id,className:"pill rounded-xl p-3 mb-2 flex justify-between"},h("span",null,`${x.start} → ${x.end}`),h(Badge,{tone:x.status==="approved"?"green":x.status==="rejected"?"red":"amber",children:x.status==="approved"?"موافق":x.status==="rejected"?"مرفوض":"قيد المراجعة"})))));
  }
- if(tab==="profile")content=h(Card,null,h("div",{className:"flex items-center gap-4 mb-5"},h(Photo,{value:photoOf(user),employeeId:user?.id,authUid:user?.authUid,legacyId:user?.employeeId,employeeKey:user?.legacyEmployeeId,token,className:"w-24 h-24 rounded-full object-cover border-2 border-cyan-300/40"}),h("div",null,h("h2",{className:"font-black text-2xl"},user.name),h("div",{className:"muted"},user.jobTitle||"موظف"),h(Badge,{tone:"green",children:branch.name}))),h("div",{className:"grid sm:grid-cols-2 gap-3"},[["الاسم",user.name],["البريد الإلكتروني",user.email],["الجوال",user.phone||"—"],["المسمى الوظيفي",user.jobTitle||"—"],["تاريخ التعيين",user.hireDate||"—"],["الفرع",branch.name],["الراتب الأساسي",money(user.baseSalary)+" ريال"],["طريقة الصرف",user.paymentMethod==="split"?"شبكة + نقدي":user.paymentMethod==="bank"?"شبكة":"نقدي"]].map(x=>h("div",{key:x[0],className:"stat rounded-xl p-3"},h("div",{className:"muted text-xs"},x[0]),h("div",{className:"font-bold mt-1"},x[1])))));
+ if(tab==="profile")content=h(Card,null,h("div",{className:"flex items-center gap-4 mb-5"},h(Photo,{value:photoOf(user),employeeId:user?.id,authUid:user?.authUid,legacyId:user?.legacyEmployeeId||user?.employeeId,employeeKey:user?.employeeKey||user?.legacyEmployeeId,userId:user?.userId,employeeCode:user?.employeeCode,token,className:"w-24 h-24 rounded-full object-cover border-2 border-cyan-300/40"}),h("div",null,h("h2",{className:"font-black text-2xl"},user.name),h("div",{className:"muted"},user.jobTitle||"موظف"),h(Badge,{tone:"green",children:branch.name}))),h("div",{className:"grid sm:grid-cols-2 gap-3"},[["الاسم",user.name],["البريد الإلكتروني",user.email],["الجوال",user.phone||"—"],["المسمى الوظيفي",user.jobTitle||"—"],["تاريخ التعيين",user.hireDate||"—"],["الفرع",branch.name],["الراتب الأساسي",money(user.baseSalary)+" ريال"],["طريقة الصرف",user.paymentMethod==="split"?"شبكة + نقدي":user.paymentMethod==="bank"?"شبكة":"نقدي"]].map(x=>h("div",{key:x[0],className:"stat rounded-xl p-3"},h("div",{className:"muted text-xs"},x[0]),h("div",{className:"font-bold mt-1"},x[1])))));
  if(tab==="salary")content=h(Salary,{user,attendance:attendance.map(a=>({...a,branch:recordBranch(a,user,branches||[branch])})),advances,branch,payrollAdjustment});
  return h("div",{className:"page-shell"},camera&&h(Selfie,{label:camera==="in"?"صورة سيلفي للتحضير":"صورة سيلفي للانصراف",onCancel:()=>{setCamera(null);setLoc(null)},onDone:capture}),h(Header,{profile:user,onLogout,token}),h("div",{className:"app-layout"},h(SideNav,{active:tab,onChange:setTab,items:[["home","الرئيسية","⌂"],["profile","ملفي","👤"],["advances","السلف","💰"],["leaves","الإجازات","🗓"],["salary","الراتب","▣"]]}),h("main",{className:"space-y-5 content-wrap"},h(NotificationPanel,{items:notifications,title:"إشعارات الموظف",onOpen:onNotificationOpen}),content)),settle&&h(SettlementModal,{advance:settle,onCancel:()=>setSettle(null),onSend:x=>{onSettlement(settle,x);setSettle(null)}}))
 }
@@ -953,6 +960,19 @@ function App(){const[session,setSession]=useState(null),[profile,setProfile]=use
     const ns=await Promise.allSettled(keys.map(k=>fbGet(`notifications/${encodeURIComponent(k)}`,t)));
     const merged=[];
     ns.forEach((r,idx)=>{if(r.status==="fulfilled"&&r.value){const key=keys[idx];flattenNotifications(r.value).forEach(n=>merged.push({...n,_notificationKey:key}));}});
+
+    // حل جذري لإشعار السلف: لا نعتمد على أن الموظف يستطيع الكتابة داخل عقدة
+    // notifications الخاصة بالمشرف (قواعد Firebase قد تمنع ذلك). المشرف يقرأ
+    // السلف المعلقة ويحوّل كل طلب جديد إلى إشعار محلي ثابت قابل للنقر.
+    if(isManagementRole(s?.role)){
+      try{
+        const av=await fbGet("advances",t);
+        flatten(av).filter(a=>String(a.status||"")==="pending").forEach(a=>{
+          const id=`advance-pending-${a.id}`;
+          merged.push({_notificationKey:s.uid,id,title:"طلب سلفة جديد",message:`${a.employeeName||"موظف"} طلب سلفة بقيمة ${money(a.amount)} ريال على ${a.installmentsCount||a.installments||0} أقساط.`,type:"advance",createdAt:Number(a.createdAt||Date.now()),read:false,requestId:a.id,payload:{...a,requestId:a.id},derived:true});
+        });
+      }catch(e){}
+    }
     const unique=new Map();
     merged.forEach(n=>unique.set(String(n.id||`${n.createdAt||0}-${n.title||""}-${n.message||""}`),n));
     setNotifications([...unique.values()].sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0)));
@@ -1142,11 +1162,17 @@ const savePayrollAdjustment=async(employeeId,month,v)=>{
 };
 const addAdvance=async({amount,installments})=>{
  const existing=(advances||[]).find(a=>employeeMatchesRecord(profile,a)&&["pending","approved"].includes(String(a.status||""))&&Number(a.remainingBalance??((a.remainingInstallments||0)*(a.installmentAmount||0)))>0);
- if(existing){alert(existing.status==="pending"?"تم تقديم طلب السلفة وهو قيد المراجعة، ولا يمكن تقديم طلب جديد حتى يتم الرد على الطلب السابق.":"لديك سلفة قائمة ولم تُغلق بعد، ولا يمكن تقديم طلب جديد حتى يتم سدادها وإغلاقها.");return false;}
+ if(existing){alert(existing.status==="pending"?"تم تقديم طلب السلفة وهو قيد المراجعة، ولا يمكن تقديم طلب جديد حتى يتم الرد عليه.":"لديك سلفة قائمة ولم تُغلق بعد، ولا يمكن تقديم طلب جديد حتى يتم سدادها وإغلاقها.");return false;}
  const n=Math.max(2,Math.min(12,Number(installments)||2)),numericAmount=Number(amount)||0;if(!(numericAmount>0))return false;
- const id=uid(),requestDate=today(),r={id,employeeId:session.uid,authUid:profile?.authUid||session.uid,employeeName:profile?.name||"",employeeEmail:profile?.email||session.email||"",amount:numericAmount,installmentsCount:n,installmentAmount:Math.round(numericAmount/n*100)/100,remainingInstallments:n,remainingBalance:numericAmount,paidAmount:0,status:"pending",requestDate,createdAt:Date.now(),managementHistory:[{action:"request",date:requestDate,by:profile?.name||"الموظف",amount:numericAmount,installments:n}]};
- const keys=[session.uid,profile?.id].filter((v,i,arr)=>v&&arr.indexOf(v)===i);for(const key of keys)await fbPut(`advances/${encodeURIComponent(key)}/${id}`,{...r,employeeId:key,authUid:profile?.authUid||session.uid},session.idToken);
- setAdvances(a=>[...a,r]);await notifySupervisors("advance",{employeeName:r.employeeName,amount:numericAmount,installments:n,requestDate,id,requestId:id,employeeId:session.uid,authUid:r.authUid});return true;
+ const id=uid(),requestDate=today(),authUid=profile?.authUid||session.uid;
+ const r={id,employeeId:session.uid,authUid,employeeName:profile?.name||"",employeeEmail:profile?.email||session.email||"",amount:numericAmount,installmentsCount:n,installmentAmount:Math.round(numericAmount/n*100)/100,remainingInstallments:n,remainingBalance:numericAmount,paidAmount:0,status:"pending",requestDate,createdAt:Date.now(),managementHistory:[{action:"request",date:requestDate,by:profile?.name||"الموظف",amount:numericAmount,installments:n}]};
+ const keys=[session.uid,profile?.id,authUid].filter((v,i,arr)=>v&&arr.indexOf(v)===i);
+ const writes=await Promise.allSettled(keys.map(key=>fbPut(`advances/${encodeURIComponent(key)}/${id}`,{...r,employeeId:key,authUid},session.idToken)));
+ if(!writes.some(x=>x.status==="fulfilled")){alert("تعذر حفظ طلب السلفة. لم يتم تسجيل الطلب، حاول مرة أخرى.");return false;}
+ setAdvances(a=>{const m=new Map(a.map(x=>[`${x.id}|${x.employeeId||x.authUid||""}`,x]));m.set(`${id}|${session.uid}`,r);return [...m.values()]});
+ // الإشعار المباشر إن سمحت قواعد Firebase، والإدارة ستكتشف الطلب أيضًا من السلفة نفسها عند التحديث.
+ await notifySupervisors("advance",{employeeName:r.employeeName,amount:numericAmount,installments:n,requestDate,id,requestId:id,employeeId:session.uid,authUid});
+ return true;
 };const addSettlement=async(a,{amount})=>{if(!amount)return;const req={id:uid(),amount,date:today(),status:"pending"};const history=[...(a.managementHistory||[]),{action:"settlementRequest",date:req.date,by:profile?.name||"الموظف",amount:Number(amount)}];await fbPatch(`advances/${session.uid}/${a.id}`,{settlementRequest:req,managementHistory:history},session.idToken);setAdvances(x=>x.map(y=>y.id===a.id?{...y,settlementRequest:req,managementHistory:history}:y));await notifySupervisors("settlement",{employeeName:profile?.name||"",amount,requestId:a.id,id:a.id,employeeId:session.uid,requestDate:req.date})};const addLeave=async(x)=>{const id=uid(),r={...x,id,employeeId:session.uid,status:"pending"};await fbPut(`leaves/${session.uid}/${id}`,r,session.idToken);setLeaves(a=>[...a,r]);await notifySupervisors("leave",{employeeName:profile?.name||"",type:r.type,start:r.start||r.startDate,end:r.end||r.endDate,days:r.days,reason:r.reason||"",requestId:id,id,employeeId:session.uid})};const updateEmp=async(id,p)=>{
  const old=employees.find(x=>String(x.id)===String(id));
  if(!old||String(old.role||"").toLowerCase()==="admin"){throw Error("لا يمكن تعديل حساب مشرف من شاشة الموظفين.");}
