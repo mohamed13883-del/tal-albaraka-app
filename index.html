@@ -166,10 +166,10 @@ const LOGO = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
 const FIREBASE_API_KEY = "AIzaSyB6kleNEq_qopMOjtvhtGZKfhf-Ud7OaEk";
 const DB_URL = "https://tal-albaraka-default-rtdb.asia-southeast1.firebasedatabase.app";
 // نظام السلف الجديد: نفصل التخزين عن النظام القديم حتى لا تتداخل أو تظهر أي سجلات سابقة.
-const ADVANCE_SYSTEM_VERSION = "2.0.0";
-const ADVANCE_STORE = "advancesV2";
-const ADVANCE_REQUEST_STORE = "advanceRequestsV2";
-const ADVANCE_INBOX_STORE = "advanceInboxV2";
+const ADVANCE_SYSTEM_VERSION = "3.0.0";
+const ADVANCE_STORE = "advances";
+const ADVANCE_REQUEST_STORE = "advanceRequests";
+const ADVANCE_INBOX_STORE = "advanceInbox";
 const AUTH_BASE = "https://identitytoolkit.googleapis.com/v1/accounts";
 const REFRESH_BASE = "https://securetoken.googleapis.com/v1/token";
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -1074,7 +1074,7 @@ function App(){const[session,setSession]=useState(null),[profile,setProfile]=use
   for(let i=rows.length-1;i>=0;i--){const typ=String(rows[i]?.type||"").toLowerCase();if((typ==="advance"||typ==="settlement"||typ==="settlementrequest")&&rows[i]?.systemVersion!==ADVANCE_SYSTEM_VERSION&&rows[i]?.payload?.systemVersion!==ADVANCE_SYSTEM_VERSION)rows.splice(i,1);}
   if(isManagementRole(s.role)){
    const [av,inbox]=await Promise.allSettled([fbGet(ADVANCE_STORE,t),fbGet(ADVANCE_INBOX_STORE,t)]);
-   const raw=av.status==="fulfilled"&&av.value?flatten(av.value):[];
+   const raw=(av.status==="fulfilled"&&av.value?flatten(av.value):[]).filter(x=>String(x.systemVersion||"")===ADVANCE_SYSTEM_VERSION);
    const inboxRaw=inbox.status==="fulfilled"&&inbox.value?flatten(inbox.value):[];
    const logical=new Map();
    raw.filter(a=>String(a.status||"")==="pending").forEach(a=>{
@@ -1176,7 +1176,7 @@ const loadHeavy=useCallback(async(s,section="all")=>{
     const want=new Set(section==="all"?["attendance","advances","leaves","locationIncidents","payrollAdjustments"]:section==="home"?["attendance","advances","locationIncidents"]:section==="reports"?["attendance","advances","payrollAdjustments"]:section==="attendance"?["attendance"]:section==="advances"?["advances"]:section==="leaves"?["leaves"]:[]);
     const jobs=[];
     if(want.has("attendance"))jobs.push(fbGet("attendance",t).then(v=>setAttendance(flatten(v))).catch(e=>{throw e}));
-    if(want.has("advances"))jobs.push(Promise.allSettled([fbGet(ADVANCE_STORE,t),fbGet(ADVANCE_REQUEST_STORE,t)]).then(rs=>{const rows=[];rs.forEach(r=>{if(r.status==="fulfilled"&&r.value)rows.push(...flatten(r.value));});const map=new Map();rows.forEach(x=>{const k=String(x.id||`${x.employeeId||""}|${x.requestDate||""}|${x.amount||0}`);const prev=map.get(k);if(!prev||Number(x.updatedAt||x.createdAt||0)>=Number(prev.updatedAt||prev.createdAt||0))map.set(k,x);});setAdvances([...map.values()]);}).catch(e=>{throw e}));
+    if(want.has("advances"))jobs.push(Promise.allSettled([fbGet(ADVANCE_STORE,t),fbGet(ADVANCE_REQUEST_STORE,t)]).then(rs=>{const rows=[];rs.forEach(r=>{if(r.status==="fulfilled"&&r.value)rows.push(...flatten(r.value));});const currentRows=rows.filter(x=>String(x.systemVersion||"")===ADVANCE_SYSTEM_VERSION);const map=new Map();currentRows.forEach(x=>{const k=String(x.id||`${x.employeeId||""}|${x.requestDate||""}|${x.amount||0}`);const prev=map.get(k);if(!prev||Number(x.updatedAt||x.createdAt||0)>=Number(prev.updatedAt||prev.createdAt||0))map.set(k,x);});setAdvances([...map.values()]);}).catch(e=>{throw e}));
     if(want.has("leaves"))jobs.push(fbGet("leaves",t).then(v=>setLeaves(flatten(v))).catch(e=>{throw e}));
     if(want.has("locationIncidents"))jobs.push(fbGet("locationIncidents",t).then(v=>setLocationIncidents(flatten(v))).catch(()=>setLocationIncidents([])));
     if(want.has("payrollAdjustments"))jobs.push(fbGet("payrollAdjustments",t).then(v=>{const out=[];Object.entries(v||{}).forEach(([eid,months])=>Object.entries(months||{}).forEach(([month,val])=>{if(val&&typeof val==="object")out.push({...val,employeeId:val.employeeId||eid,month:String(val.month||month)});}));setPayrollAdjustments(out)}).catch(()=>setPayrollAdjustments([])));
@@ -1193,7 +1193,7 @@ const loadHeavy=useCallback(async(s,section="all")=>{
   const todayReads=await Promise.allSettled(keys.map(k=>fbGet(`attendance/${k}/${today()}`,t)));
   const as=attReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
   const todayAs=todayReads.flatMap(x=>x.status==="fulfilled"&&x.value?[x.value]:[]);
-  const avs=advReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
+  const avs=advReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]).filter(x=>String(x.systemVersion||"")===ADVANCE_SYSTEM_VERSION);
   const advanceMap=new Map();
   avs.forEach(x=>{const k=String(x.id||`${x.requestDate||""}|${x.amount||0}|${x.employeeId||""}`);const prev=advanceMap.get(k);if(!prev||Number(x.updatedAt||x.createdAt||0)>Number(prev.updatedAt||prev.createdAt||0))advanceMap.set(k,x);});
   const ls=leaveReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
@@ -1296,18 +1296,7 @@ const logout=()=>{setSession(null);setProfile(null);localStorage.removeItem("tal
  return managers.length;
 };
 const notifyEmployee=async(employeeId,authUid,data)=>{try{const keys=[employeeId,authUid].filter((v,i,a)=>v&&a.indexOf(v)===i);for(const key of keys)await fbPut(`notifications/${encodeURIComponent(key)}/${data.id}`,data,session.idToken);return true}catch(e){return false}};
-const resetLegacyAdvances=async()=>{
- const ok=window.confirm("سيتم حذف بيانات السلف القديمة من قاعدة البيانات نهائيًا، ولن يتم حذف الموظفين أو الحضور أو الرواتب أو الإجازات. هل تريد بدء نظام السلف الجديد من الصفر؟");
- if(!ok)return false;
- const legacyPaths=["advances","advanceRequests","advanceInbox"];
- const results=await Promise.allSettled(legacyPaths.map(path=>fbDelete(path,session.idToken)));
- const failed=results.filter(x=>x.status==="rejected");
- setAdvances([]);
- if(failed.length){alert("تم تهيئة واجهة السلف الجديدة، لكن تعذر حذف بعض بيانات السلف القديمة بسبب صلاحيات Firebase. النظام الجديد لن يقرأها أو يعرضها.");return false;}
- alert("تم حذف بيانات السلف القديمة وتهيئة نظام السلف الجديد بنجاح. الآن كل طلب جديد سيبدأ بسجل جديد مستقل.");
- await loadNotifications(session).catch(()=>{});
- return true;
-};
+const resetLegacyAdvances=async()=>false;
 const updateAttendance=async(r)=>{const nb=recordBranch(r,employees.find(e=>employeeMatchesRecord(e,r)),branches);const m=shiftMetrics(r,nb);const oldId=r._oldEmployeeId||r.employeeId,oldDate=r._oldDate||r.date;const clean={...r};delete clean._oldEmployeeId;delete clean._oldDate;Object.assign(clean,{date:dateKey(r.date),employeeId:r.employeeId,branchId:nb.id,branchName:nb.name,branchLat:Number(nb.lat),branchLng:Number(nb.lng),branchRadiusMeters:Math.max(10,Math.min(5000,Number(nb.radiusMeters)||300)),branchShiftStart:nb.shiftStart,branchShiftEnd:nb.shiftEnd,requiredHours:Math.max(0.25,Number(nb.requiredHours)||8),workHours:m.work,overtimeHours:m.ot,overtimeBefore:m.otBefore,overtimeAfter:m.otAfter,verified:true});if(String(oldId)!==String(r.employeeId)||String(oldDate)!==String(r.date))await fbDelete(`attendance/${oldId}/${oldDate}`,session.idToken);await fbPut(`attendance/${r.employeeId}/${r.date}`,clean,session.idToken);setAttendance(a=>[...a.filter(x=>!(String(x.employeeId)===String(oldId)&&String(x.date)===String(oldDate))&&!(String(x.employeeId)===String(r.employeeId)&&String(x.date)===String(r.date))),clean])};
 const supervisorCheckout=async(a)=>{
  const emp=employees.find(e=>employeeMatchesRecord(e,a));
