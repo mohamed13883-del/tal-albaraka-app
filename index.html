@@ -870,51 +870,9 @@ function Admin({profile,token,employees,branches,attendance,advances,leaves,loca
 }
 async function resolveEmployeeForAuth(uid,email,token){
   const em=String(email||"").trim().toLowerCase();
-  // المسار الأساسي: حساب Firebase يُحفظ عادةً تحت UID نفسه.
-  // لا نقرأ شجرة employees كاملة هنا؛ هذا كان سببًا رئيسيًا في بطء/تعليق شاشة البداية
-  // عندما تحتوي قاعدة البيانات على عدد كبير من السجلات أو صور قديمة.
-  try{
-    const direct=await fbGet(`employees/${encodeURIComponent(uid)}`,token);
-    if(direct){
-      let photo=photoOf(direct);
-      if(!photo){
-        const photoKeys=[uid,direct?.authUid,direct?.employeeId,direct?.legacyEmployeeId,direct?.id].filter((v,i,a)=>v&&a.indexOf(v)===i);
-        for(const key of photoKeys){try{const pv=await fbGet(`employeePhotos/${encodeURIComponent(key)}`,token);photo=photoOf(pv);if(photo)break;}catch(e){}}
-      }
-      // إذا كان سجل UID الحالي موجودًا لكنه بلا صورة، فقد تكون الصورة ما زالت في سجل موظف قديم بنفس البريد أو authUid.
-      // نبحث عن النسخة القديمة فقط عند غياب الصورة، ثم نستخدم الصورة دون تغيير هوية الحساب الحالية.
-      if(!photo){
-        try{
-          const allEmployees=await fbGet("employees",token);
-          if(allEmployees&&typeof allEmployees==="object"){
-            const emailKey=String(direct?.email||email||"").trim().toLowerCase();
-            for(const [oldId,oldRaw] of Object.entries(allEmployees)){
-              if(String(oldId)===String(uid))continue;
-              const sameUid=String(oldRaw?.authUid||"")===String(uid);
-              const sameEmail=!!emailKey&&String(oldRaw?.email||"").trim().toLowerCase()===emailKey;
-              if(sameUid||sameEmail){
-                const oldPhoto=photoOf(oldRaw);
-                if(oldPhoto){photo=oldPhoto;break;}
-                for(const oldKey of [oldId,oldRaw?.authUid,oldRaw?.employeeId,oldRaw?.legacyEmployeeId].filter(Boolean)){
-                  try{const pv=await fbGet(`employeePhotos/${encodeURIComponent(oldKey)}`,token);const ph=photoOf(pv);if(ph){photo=ph;break}}catch(e){}
-                }
-                if(photo)break;
-              }
-            }
-          }
-        }catch(e){}
-      }
-      const merged=photo?{...direct,photoData:photo,profilePhoto:photo,photo,image:photo,avatar:photo}:direct;
-      const result={...normalizeEmployee(uid,merged),authUid:uid};
-      // الحساب الإداري لا يتأثر بعلامات أرشيف قديمة.
-      const role=String(result.role||"employee").toLowerCase();
-      if(["admin","supervisor","manager"].includes(role)&&result.active===false)result.active=true;
-      return result;
-    }
-  }catch(e){}
-
-  // مسار احتياطي فقط للحسابات القديمة التي لا يكون سجلها تحت UID مباشرة.
   const candidates=[];
+  // أولوية ثابتة: UID ثم authUid ثم البريد. لا نعتبر active=false سببًا لاختيار السجل الخطأ.
+  try{const direct=await fbGet(`employees/${encodeURIComponent(uid)}`,token);if(direct)candidates.push([uid,direct,100]);}catch(e){}
   try{
     const es=await fbGet("employees",token);
     if(es){
@@ -930,20 +888,22 @@ async function resolveEmployeeForAuth(uid,email,token){
   let best=null,bestScore=-Infinity;
   for(const [id,v,base] of candidates){
     let photo=photoOf(v);
-    if(!photo){
+    if(!photo && !toNum(v?.photoRemovedAt)){
       for(const key of [id,v?.authUid,uid].filter(Boolean)){
-        try{const one=await fbGet(`employeePhotos/${encodeURIComponent(key)}`,token);photo=photoOf(one);if(photo)break}catch(e){}
+        try{const one=await fbGet(`employeePhotos/${encodeURIComponent(key)}`,token);photo=photoOf(one);if(photo)break;}catch(e){}
       }
     }
+    // الحساب الإداري لا يدخل في حالة الأرشيف؛ الموظف العادي يظل خاضعًا لـ active.
     const role=String(v?.role||"employee").toLowerCase();
-    const isAdmin=["admin","supervisor","manager"].includes(role);
+    const isAdmin=role==="admin"||role==="supervisor"||role==="manager";
     const score=base+(isAdmin?30:0)+(v?.active!==false?10:-10)+(photo?2:0)+(v?.name?2:0)+(v?.email?1:0);
     if(score>bestScore){bestScore=score;best={id,v,photo,isAdmin};}
   }
   if(!best)return null;
   const merged=best.photo?{...best.v,photoData:best.photo,profilePhoto:best.photo,photo:best.photo,image:best.photo,avatar:best.photo}:best.v;
   const result={...normalizeEmployee(best.id,merged),authUid:uid};
-  if(best.isAdmin&&result.active===false)result.active=true;
+  // المشرف حساب إداري ولا ينبغي أن يعلق بسبب علامة أرشيف قديمة. لا نحذف سجل الأرشيف.
+  if(best.isAdmin && result.active===false)result.active=true;
   return result;
 }
 
