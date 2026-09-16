@@ -553,7 +553,7 @@ function Employee({user,branch,branches,attendance,advances,leaves,payrollAdjust
  const pending=advances.filter(a=>a.status==="approved"&&Number(a.remainingBalance??((a.remainingInstallments||0)*(a.installmentAmount||0)))>0);
  const blockingAdvance=advances.find(a=>["pending","approved"].includes(String(a.status||""))&&Number(a.remainingBalance??((a.remainingInstallments||0)*(a.installmentAmount||0)))>0);
  useEffect(()=>{
-  const fn=e=>{const d=e.detail||{};if(d.target)setTab(d.target);if(d.requestId)setTimeout(()=>{const kind=d.target==="leaves"?"leave":"advance";const el=document.getElementById(`request-${kind}-${d.requestId}`);if(el){el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("ring-2","ring-cyan-400");setTimeout(()=>el.classList.remove("ring-2","ring-cyan-400"),1800)}},150)};
+  const fn=e=>{const d=e.detail||{};const target=d.target||((String(d.type||"").toLowerCase().includes("leave"))?"leaves":((String(d.type||"").toLowerCase().includes("advance")||String(d.type||"").toLowerCase().includes("settlement"))?"advances":"home"));if(target)setTab(target);if(d.requestId)setTimeout(()=>{const id=String(d.requestId);const ids=target==="leaves"?[`request-leave-${id}`]:[`request-settlement-${id}`,`request-advance-${id}`];const el=ids.map(x=>document.getElementById(x)).find(Boolean);if(el){el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("ring-2","ring-cyan-400");setTimeout(()=>el.classList.remove("ring-2","ring-cyan-400"),2200)}},350)};
   window.addEventListener("tal-notification-open",fn);return()=>window.removeEventListener("tal-notification-open",fn);
  },[]);
  const remaining=a=>Math.max(0,Number(a.remainingBalance??((a.remainingInstallments||0)*(a.installmentAmount||0))));
@@ -780,7 +780,7 @@ function Admin({profile,token,employees,branches,attendance,advances,leaves,loca
  },[tab,reportEmployees,attendance,branches,advances,payrollAdjustments,month]);
  const pendingSettlements=advances.filter(a=>a.settlementRequest?.status==="pending");
  useEffect(()=>{
-  const fn=e=>{const d=e.detail||{};if(d.target)setTab(d.target);if(d.requestId)setTimeout(()=>{const kind=d.target==="leaves"?"leave":"advance";const el=document.getElementById(`request-${kind}-${d.requestId}`);if(el){el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("ring-2","ring-cyan-400");setTimeout(()=>el.classList.remove("ring-2","ring-cyan-400"),1800)}},150)};
+  const fn=e=>{const d=e.detail||{};const target=d.target||((String(d.type||"").toLowerCase().includes("leave"))?"leaves":((String(d.type||"").toLowerCase().includes("advance")||String(d.type||"").toLowerCase().includes("settlement"))?"advances":"home"));if(target)setTab(target);if(d.requestId)setTimeout(()=>{const id=String(d.requestId);const ids=target==="leaves"?[`request-leave-${id}`]:[`request-settlement-${id}`,`request-advance-${id}`];const el=ids.map(x=>document.getElementById(x)).find(Boolean);if(el){el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("ring-2","ring-cyan-400");setTimeout(()=>el.classList.remove("ring-2","ring-cyan-400"),2200)}},350)};
   window.addEventListener("tal-notification-open",fn);return()=>window.removeEventListener("tal-notification-open",fn);
  },[]);
  useEffect(()=>{if(onLoadSection)onLoadSection(tab).catch(()=>{});},[tab,onLoadSection]);
@@ -1015,41 +1015,27 @@ function startFirebaseStream(path,token,onChange){
   return ()=>{closed=true;es.close();};
 }
 function App(){const[session,setSession]=useState(null),[profile,setProfile]=useState(null),[employees,setEmployees]=useState([]),[branches,setBranches]=useState([]),[attendance,setAttendance]=useState([]),[advances,setAdvances]=useState([]),[leaves,setLeaves]=useState([]),[locationIncidents,setLocationIncidents]=useState([]),[payrollAdjustments,setPayrollAdjustments]=useState([]),[notifications,setNotifications]=useState([]),[loading,setLoading]=useState(true);const loadNotifications=useCallback(async(s)=>{
-  try{
-    const t=s.idToken, uidKey=encodeURIComponent(s.uid);
-    const rows=[];
-    const readNotices=async(key)=>{try{const v=await fbGet(`notifications/${encodeURIComponent(key)}`,t);if(v)rows.push(...flatten(v));}catch(e){}};
-    await readNotices(s.uid);
-    try{const pr=await fbGet(`employees/${uidKey}`,t);for(const k of [pr?.id,pr?.authUid].filter((v,i,a)=>v&&a.indexOf(v)===i))await readNotices(k);}catch(e){}
-    if(isManagementRole(s.role)){
-      const av=await fbGet("advances",t).catch(()=>null);
-      const raw=av?flatten(av):[];
-      const seen=new Set();
-      raw.forEach(a=>{
-        const id=String(a.id||""); if(!id||seen.has(id))return; seen.add(id);
-        const status=String(a.status||"");
-        if(status==="pending") rows.push({id:`advance-request-${id}`,title:"طلب سلفة جديد",message:`${a.employeeName||"موظف"} طلب سلفة بقيمة ${money(a.amount)} ريال على ${a.installmentsCount||a.installments||0} أقساط.`,type:"advance",createdAt:Number(a.createdAt||Date.now()),read:false,requestId:id,payload:{...a,requestId:id}});
-        if(a.settlementRequest?.status==="pending") rows.push({id:`settlement-request-${id}`,title:"طلب سداد سلفة",message:`${a.employeeName||"موظف"} طلب سداد بقيمة ${money(a.settlementRequest.amount)} ريال من السلفة.`,type:"settlement",createdAt:Number(a.settlementRequest?.date?new Date(a.settlementRequest.date).getTime():a.createdAt||Date.now()),read:false,requestId:id,payload:{...a,requestId:id}});
-      });
-    }else{
-      const keys=[s.uid];
-      try{const raw=await fbGet(`employees/${uidKey}`,t);if(raw?.id)keys.push(raw.id);if(raw?.authUid)keys.push(raw.authUid)}catch(e){}
-      for(const key of [...new Set(keys)])await readNotices(key);
-      const avs=[];
-      for(const key of [...new Set(keys)]){try{const v=await fbGet(`advances/${encodeURIComponent(key)}`,t);if(v)avs.push(...flatten(v));}catch(e){}}
-      const amap=new Map();avs.forEach(a=>{const id=String(a.id||"");if(id&&!amap.has(id))amap.set(id,a)});
-      amap.forEach(a=>{
-        const id=String(a.id||""),status=String(a.status||"");if(!id)return;
-        const label=status==="pending"?"قيد المراجعة":status==="approved"?"تمت الموافقة":status==="rejected"?"تم رفض الطلب":status==="closed"?"تم إغلاق السلفة":"تحديث السلفة";
-        if(["pending","approved","rejected"].includes(status)) rows.push({id:`advance-status-${id}-${status}`,title:"تحديث طلب السلفة",message:`طلب السلفة بقيمة ${money(a.amount)} ريال: ${label}${status==="rejected"&&a.rejectionReason?` — السبب: ${a.rejectionReason}`:""}.`,type:"advance",createdAt:Number(a.updatedAt||a.createdAt||Date.now()),read:false,requestId:id,payload:{...a,requestId:id}});
-        if(a.settlementRequest?.status==="pending") rows.push({id:`settlement-status-${id}-pending`,title:"طلب سداد سلفة",message:`تم إرسال طلب سداد بقيمة ${money(a.settlementRequest.amount)} ريال وهو قيد مراجعة المشرف.`,type:"settlement",createdAt:Number(a.settlementRequest?.createdAt||Date.now()),read:false,requestId:id,payload:{...a,requestId:id}});
-        if(a.settlementRequest?.status==="approved") rows.push({id:`settlement-status-${id}-approved`,title:"تحديث طلب السداد",message:`تمت الموافقة على طلب سداد ${money(a.settlementRequest.amount)} ريال.`,type:"settlement",createdAt:Number(a.settlementRequest?.updatedAt||Date.now()),read:false,requestId:id,payload:{...a,requestId:id}});
-        if(a.settlementRequest?.status==="rejected") rows.push({id:`settlement-status-${id}-rejected`,title:"تحديث طلب السداد",message:`تم رفض طلب سداد ${money(a.settlementRequest.amount)} ريال.${a.settlementRequest.rejectionReason?` السبب: ${a.settlementRequest.rejectionReason}`:""}`,type:"settlement",createdAt:Number(a.settlementRequest?.updatedAt||Date.now()),read:false,requestId:id,payload:{...a,requestId:id}});
-      });
-    }
-    const map=new Map();rows.forEach(x=>{const logical=String(x.requestId||x.payload?.requestId||x.payload?.id||x.id||"");const k=`${x.type||"notice"}|${logical}|${x.status||"pending"}`;const prev=map.get(k);if(!prev||Number(x.createdAt||0)>Number(prev.createdAt||0))map.set(k,x)});
-    setNotifications([...map.values()].sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0)).slice(0,20));
-  }catch(e){setNotifications([])}
+ try{
+  const t=s.idToken;
+  const direct=await Promise.allSettled([fbGet(`notifications/${encodeURIComponent(s.uid)}`,t)]);
+  const rows=[];
+  direct.forEach(r=>{if(r.status==="fulfilled"&&r.value)rows.push(...flatten(r.value));});
+  if(isManagementRole(s.role)){
+   const av=await fbGet("advances",t).catch(()=>null);
+   const raw=av?flatten(av):[];
+   const seen=new Set();
+   raw.filter(a=>String(a.status||"")==="pending").forEach(a=>{
+    const key=String(a.id||""); if(!key||seen.has(key))return; seen.add(key);
+    rows.push({id:`advance-${key}`,title:"طلب سلفة جديد",message:`${a.employeeName||"موظف"} طلب سلفة بقيمة ${money(a.amount)} ريال على ${a.installmentsCount||a.installments||0} أقساط.`,type:"advance",target:"advances",action:"open",createdAt:Number(a.createdAt||Date.now()),read:false,requestId:key,payload:{...a,requestId:key,target:"advances",action:"open"}});
+   });
+  }else{
+   const keys=[s.uid];
+   try{const raw=await fbGet(`employees/${encodeURIComponent(s.uid)}`,t);if(raw?.id&&String(raw.id)!==String(s.uid))keys.push(raw.id);if(raw?.authUid&&String(raw.authUid)!==String(s.uid))keys.push(raw.authUid)}catch(e){}
+   for(const key of [...new Set(keys)]){try{const v=await fbGet(`notifications/${encodeURIComponent(key)}`,t);if(v)rows.push(...flatten(v));}catch(e){}}
+  }
+  const map=new Map(); rows.forEach(x=>{const k=String(x.id||`${x.type||""}|${x.requestId||x.payload?.requestId||""}|${x.createdAt||0}`);const prev=map.get(k);if(!prev||Number(x.createdAt||0)>Number(prev.createdAt||0))map.set(k,x)});
+  setNotifications([...map.values()].sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0)));
+ }catch(e){setNotifications([])}
 },[]);
 const load=useCallback(async(s)=>{
   const t=tokenOf(s);
@@ -1150,10 +1136,10 @@ const loadHeavy=useCallback(async(s,section="all")=>{
 const openNotification=async(n)=>{
  if(!n)return;
  const now=Date.now();
- if(n.id){try{const key=n._notificationKey||session.uid;await fbPatch(`notifications/${encodeURIComponent(key)}/${encodeURIComponent(n.id)}`,{read:true,readAt:now},session.idToken)}catch(e){}}
+ if(n.id){try{const key=n._notificationKey||session.uid;await fbPatch(`notifications/${key}/${n.id}`,{read:true,readAt:now},session.idToken)}catch(e){}}
  setNotifications(prev=>prev.map(x=>String(x.id)===String(n.id)?{...x,read:true,readAt:now}:x));
  const type=String(n.type||"").toLowerCase();
- const target=type.includes("leave")?"leaves":(type.includes("advance")||type.includes("settlement"))?"advances":type==="location_security"?"attendance":"home";
+ const target=n.target||((type.includes("leave"))?"leaves":((type.includes("advance")||type.includes("settlement"))?"advances":type==="location_security"?"attendance":"home"));
  const requestId=n.requestId||n.payload?.requestId||n.payload?.id;
  setTimeout(()=>window.dispatchEvent(new CustomEvent("tal-notification-open",{detail:{...n,target,requestId}})),0);
 };
@@ -1180,7 +1166,7 @@ useEffect(()=>{(async()=>{
   setLoading(false);
 })()},[load]);
 useEffect(()=>{if(!session)return;let busy=false;const refreshData=async()=>{if(busy)return;busy=true;try{await loadHeavy(session,isManagementRole(session.role)?"none":"all");await loadNotifications(session)}catch(e){if(e?.message==="AUTH_EXPIRED"&&session.refreshToken){try{const r=await refresh(session.refreshToken);const ns={...session,idToken:r.idToken,refreshToken:r.refreshToken,uid:session.uid,email:session.email,role:session.role};setSession(ns);localStorage.setItem("tal_session",JSON.stringify({refreshToken:r.refreshToken,email:session.email||"",role:session.role||"employee"}));await load(ns);await loadHeavy(ns,isManagementRole(ns.role)?"none":"all");await loadNotifications(ns)}catch(_){}}}finally{busy=false}};refreshData();const id=setInterval(refreshData,30000);const vis=()=>{if(document.visibilityState==="visible")refreshData()};document.addEventListener("visibilitychange",vis);return()=>{clearInterval(id);document.removeEventListener("visibilitychange",vis)}},[session,load,loadHeavy]);
-useEffect(()=>{if(!session)return;let timer=null;const trigger=()=>{clearTimeout(timer);timer=setTimeout(()=>loadNotifications(session).catch(()=>{}),180)};const pkey=profile?.id;const employeePath=isManagementRole(profile?.role)?"employees":`employees/${encodeURIComponent(pkey||session.uid)}`;const notificationPaths=[`notifications/${encodeURIComponent(session.uid)}`];if(pkey&&String(pkey)!==String(session.uid))notificationPaths.push(`notifications/${encodeURIComponent(pkey)}`);const stops=[employeePath,...notificationPaths].map(path=>startFirebaseStream(path,session.idToken,trigger));return()=>{clearTimeout(timer);stops.forEach(fn=>fn&&fn())}},[session,load,profile?.role,profile?.id]);
+useEffect(()=>{if(!session)return;let timer=null;const trigger=()=>{clearTimeout(timer);timer=setTimeout(()=>loadNotifications(session).catch(()=>{}),180)};const pkey=profile?.id;const employeePath=isManagementRole(profile?.role)?"employees":`employees/${encodeURIComponent(pkey||session.uid)}`;const notificationPaths=[`notifications/${encodeURIComponent(session.uid)}`];if(pkey&&String(pkey)!==String(session.uid))notificationPaths.push(`notifications/${encodeURIComponent(pkey)}`);if(isManagementRole(profile?.role))notificationPaths.push("advances");const stops=[employeePath,...notificationPaths].map(path=>startFirebaseStream(path,session.idToken,trigger));return()=>{clearTimeout(timer);stops.forEach(fn=>fn&&fn())}},[session,load,profile?.role,profile?.id]);
 useEffect(()=>{if(!session?.uid)return;const e=isManagementRole(session.role)?employees.find(x=>String(x.id)===String(session.uid)||String(x.authUid||"")===String(session.uid)):employees.find(x=>String(x.id)===String(session.uid)||String(x.authUid||"")===String(session.uid)||(session.email&&String(x.email||"").toLowerCase()===String(session.email||"").toLowerCase()));if(e){const isAdminSession=String(session.role||"").toLowerCase()==="admin"||String(session.role||"").toLowerCase()==="supervisor"||String(session.role||"").toLowerCase()==="manager";if(isAdminSession&&!(["admin","supervisor","manager"].includes(String(e.role||"").toLowerCase())))return;setProfile(p=>({...p,...e,role:isAdminSession?(p?.role||session.role):e.role,authUid:session.uid,photoData:photoOf(e)||photoOf(p)||""}))}},[employees,session?.uid]);
 const logout=()=>{setSession(null);setProfile(null);localStorage.removeItem("tal_session")};const branch=branches.find(b=>b.id===profile?.branchId)||branches[0]||DEFAULT_BRANCH;const addAttendance=async({type,selfie,distance,lat,lng,securityEvent,securityReason,accuracy,locationTimestamp})=>{
  const date=today(),stamp=now(),activeBranch=branches.find(b=>b.id===profile?.branchId)||branch;
@@ -1210,22 +1196,16 @@ const logout=()=>{setSession(null);setProfile(null);localStorage.removeItem("tal
  if(old.authUid&&String(old.authUid)!==String(session.uid))await fbPatch(`attendance/${old.authUid}/${attendanceDate}`,up,session.idToken).catch(()=>{});
  setAttendance(a=>a.map(x=>employeeMatchesRecord(profile,x)&&recordDate(x)===attendanceDate?{...x,...up}:x));return true;
 };const notifySupervisors=async(type,payload)=>{
-  try{
-    const fresh=await fbGet("employees",session.idToken);
-    const source=fresh?Object.entries(fresh).map(([id,v])=>normalizeEmployee(id,v)):employees;
-    const managers=source.filter(e=>isManagementRole(e?.role)&&e?.active!==false);
-    const nid=uid(),now=Date.now();
-    const title=type==="advance"?"طلب سلفة جديد":type==="leave"?"طلب إجازة جديد":"طلب سداد سلفة";
-    const message=type==="advance"?`${payload.employeeName||"موظف"} طلب سلفة بقيمة ${money(payload.amount)} ريال على ${payload.installments} أقساط.`:type==="leave"?`${payload.employeeName||"موظف"} طلب إجازة من ${payload.start||""} إلى ${payload.end||""}.`:`${payload.employeeName||"موظف"} طلب سداد بقيمة ${money(payload.amount)} ريال من السلفة.`;
-    const notification={id:nid,title,message,type,createdAt:now,read:false,requestId:payload.requestId||payload.id,payload};
-    let delivered=0;
-    for(const a of managers){
-      const keys=[a.id,a.authUid].filter((v,i,arr)=>v&&arr.indexOf(v)===i);
-      for(const key of keys){try{await fbPut(`notifications/${encodeURIComponent(key)}/${nid}`,notification,session.idToken);delivered++;}catch(e){}}
-      if(a.email)await fbPut(`emailNotifications/${nid}-${String(a.id)}`,{id:nid,to:a.email,type,payload,createdAt:now,status:"queued",subject:title,message},session.idToken).catch(()=>{});
-    }
-    return delivered>0?managers.length:0;
-  }catch(e){return 0;}
+ try{
+  const fresh=await fbGet("employees",session.idToken);
+  const source=fresh?Object.entries(fresh).map(([id,v])=>normalizeEmployee(id,v)):employees;
+  const managers=source.filter(e=>isManagementRole(e?.role)&&e?.active!==false);
+  const nid=uid();
+  const title=type==="advance"?"طلب سلفة جديد":type==="leave"?"طلب إجازة جديد":"طلب سداد سلفة";
+  const message=type==="advance"?`${payload.employeeName||"موظف"} طلب سلفة بقيمة ${money(payload.amount)} ريال على ${payload.installments} أقساط.`:type==="leave"?`${payload.employeeName||"موظف"} طلب إجازة من ${payload.start||""} إلى ${payload.end||""}.`:`${payload.employeeName||"موظف"} طلب سداد بقيمة ${money(payload.amount)} ريال من السلفة.`;
+  for(const a of managers){const keys=[a.id,a.authUid].filter((v,i,arr)=>v&&arr.indexOf(v)===i);for(const key of keys)await fbPut(`notifications/${encodeURIComponent(key)}/${nid}`,{id:nid,title,message,type,target:type==="leave"?"leaves":"advances",action:"open",requestId:payload.requestId||payload.id||"",createdAt:Date.now(),read:false,payload:{...payload,target:type==="leave"?"leaves":"advances",action:"open",requestId:payload.requestId||payload.id||""}},session.idToken);if(a.email)await fbPut(`emailNotifications/${nid}`,{id:nid,to:a.email,type,payload,createdAt:Date.now(),status:"queued",subject:title,message},session.idToken).catch(()=>{});}
+  return managers.length;
+ }catch(e){return 0;}
 };
 const notifyEmployee=async(employeeId,authUid,data)=>{try{const keys=[employeeId,authUid].filter((v,i,a)=>v&&a.indexOf(v)===i);for(const key of keys)await fbPut(`notifications/${encodeURIComponent(key)}/${data.id}`,data,session.idToken);return true}catch(e){return false}};
 const updateAttendance=async(r)=>{const nb=recordBranch(r,employees.find(e=>employeeMatchesRecord(e,r)),branches);const m=shiftMetrics(r,nb);const oldId=r._oldEmployeeId||r.employeeId,oldDate=r._oldDate||r.date;const clean={...r};delete clean._oldEmployeeId;delete clean._oldDate;Object.assign(clean,{date:dateKey(r.date),employeeId:r.employeeId,branchId:nb.id,branchName:nb.name,branchLat:Number(nb.lat),branchLng:Number(nb.lng),branchRadiusMeters:Math.max(10,Math.min(5000,Number(nb.radiusMeters)||300)),branchShiftStart:nb.shiftStart,branchShiftEnd:nb.shiftEnd,requiredHours:Math.max(0.25,Number(nb.requiredHours)||8),workHours:m.work,overtimeHours:m.ot,overtimeBefore:m.otBefore,overtimeAfter:m.otAfter,verified:true});if(String(oldId)!==String(r.employeeId)||String(oldDate)!==String(r.date))await fbDelete(`attendance/${oldId}/${oldDate}`,session.idToken);await fbPut(`attendance/${r.employeeId}/${r.date}`,clean,session.idToken);setAttendance(a=>[...a.filter(x=>!(String(x.employeeId)===String(oldId)&&String(x.date)===String(oldDate))&&!(String(x.employeeId)===String(r.employeeId)&&String(x.date)===String(r.date))),clean])};
@@ -1362,13 +1342,13 @@ const manageAdvance=async(a,change)=>{const path=`advances/${a.employeeId}/${a.i
   const st=status==="approvedSettlement"?"approved":"rejected",req={...r.settlementRequest,status:st};if(st==="approved")req.deductionMonth=monthKey(today());if(st==="rejected")req.rejectionReason=String(reason||"").trim();
   const history=[...(r.managementHistory||[]),{action:st==="approved"?"settlementApproved":"settlementRejected",date:today(),by:profile?.name||"المشرف",amount:Number(req.amount)||0,...(st==="rejected"?{reason:String(reason||"").trim()}: {})}],patch={settlementRequest:req,managementHistory:history};
   if(st==="approved")Object.assign(patch,{remainingInstallments:0,remainingBalance:0,status:"closed",closedAt:Date.now(),closedBy:profile?.name||"المشرف"});await Promise.allSettled([r.employeeId,r.authUid,r.uid,r.userId].filter((v,i,arr)=>v&&arr.indexOf(v)===i).map(key=>fbPatch(`advances/${encodeURIComponent(key)}/${r.id}`,patch,session.idToken)));setAdvances(a=>a.map(x=>x.id===r.id?{...x,...patch}:x));
-  try{const nid=uid();await notifyEmployee(r.employeeId,r.authUid,{id:nid,title:"تحديث طلب السداد",message:st==="approved"?"تمت الموافقة على طلب سداد المتبقي من السلفة.":`تم رفض طلب سداد المتبقي من السلفة. السبب: ${String(reason||"").trim()}`,type:"settlement",createdAt:Date.now(),read:false,requestId:r.id,payload:{requestId:r.id,id:r.id,rejectionReason:String(reason||"").trim()},status:st})}catch(e){}return;
+  try{const nid=uid();await notifyEmployee(r.employeeId,r.authUid,{id:nid,title:"تحديث طلب السداد",message:st==="approved"?"تمت الموافقة على طلب سداد المتبقي من السلفة.":`تم رفض طلب سداد المتبقي من السلفة. السبب: ${String(reason||"").trim()}`,type:"settlement",target:"advances",action:"open",createdAt:Date.now(),read:false,requestId:r.id,payload:{requestId:r.id,id:r.id,rejectionReason:String(reason||"").trim(),target:"advances",action:"open"},status:st})}catch(e){}return;
  }
  const path=type==="leave"?"leaves":"advances",isRejected=status==="rejected",reasonText=String(reason||"").trim();const history=type==="advance"?[...(r.managementHistory||[]),{action:status==="approved"?"approved":"rejected",date:today(),by:profile?.name||"المشرف",amount:Number(r.amount)||0,...(isRejected?{reason:reasonText}: {})}]:null;const patch=type==="advance"?{status,managementHistory:history,...(isRejected?{rejectionReason:reasonText,rejectedAt:Date.now(),rejectedBy:profile?.name||"المشرف"}:{})}:{status,...(isRejected?{rejectionReason:reasonText,rejectedAt:Date.now(),rejectedBy:profile?.name||"المشرف"}:{})};
  const keys=[r.employeeId,r.authUid,r.uid,r.userId].filter((v,i,arr)=>v&&arr.indexOf(v)===i);
  await Promise.allSettled(keys.map(key=>fbPatch(`${path}/${encodeURIComponent(key)}/${r.id}`,patch,session.idToken)));
  const set=type==="leave"?setLeaves:setAdvances;set(a=>a.map(x=>x.id===r.id?{...x,...patch}:x));
- try{const nid=uid(),msg=isRejected?`تم رفض طلب ${type==="advance"?"السلفة":"الإجازة"}. السبب: ${reasonText}`:`تمت الموافقة على طلب ${type==="advance"?"السلفة":"الإجازة"}.`;await notifyEmployee(r.employeeId,r.authUid,{id:nid,title:type==="leave"?"تحديث طلب الإجازة":"تحديث طلب السلفة",message:msg,type,createdAt:Date.now(),read:false,requestId:r.id,status,payload:{requestId:r.id,id:r.id,rejectionReason:reasonText}})}catch(e){}
+ try{const nid=uid(),msg=isRejected?`تم رفض طلب ${type==="advance"?"السلفة":"الإجازة"}. السبب: ${reasonText}`:`تمت الموافقة على طلب ${type==="advance"?"السلفة":"الإجازة"}.`;await notifyEmployee(r.employeeId,r.authUid,{id:nid,title:type==="leave"?"تحديث طلب الإجازة":"تحديث طلب السلفة",message:msg,type,target:type==="leave"?"leaves":"advances",action:"open",createdAt:Date.now(),read:false,requestId:r.id,status,payload:{requestId:r.id,id:r.id,rejectionReason:reasonText,target:type==="leave"?"leaves":"advances",action:"open"}})}catch(e){}
 };;if(loading)return h("div",{className:"app-bg min-h-screen grid place-items-center p-6"},h("div",{className:"glass rounded-3xl p-7 text-center max-w-md w-full"},[h("div",{className:"w-full flex justify-center"},h(Logo,{large:true})),h("div",{className:"font-black text-xl mt-4"},"جاري تجهيز النظام…"),h("div",{className:"muted text-sm mt-2"},"يتم التحقق من الحساب وتحميل البيانات الأساسية."),h("div",{className:"mt-5 h-1.5 rounded-full bg-white/10 overflow-hidden"},h("div",{className:"h-full bg-cyan-400 rounded-full animate-pulse",style:{width:"62%"}}))]));if(!session)return h(Login,{onLogin:login});if(!profile)return h("div",{className:"app-bg min-h-screen grid place-items-center p-6"},h("div",{className:"glass rounded-3xl p-7 text-center max-w-md w-full"},h(Logo,{large:true}),h("div",{className:"font-black text-xl mt-4"},"جارٍ تجهيز الحساب…")));const adminRole=["admin","supervisor","manager"].includes(String(profile.role||session.role||"").toLowerCase());return adminRole?h(Admin,{profile,token:session.idToken,employees,branches,attendance,advances,leaves,locationIncidents,payrollAdjustments,onLogout:logout,onAddEmployee:addEmp,onUpdateEmployee:updateEmp,onDeactivate:deactivate,onSaveBranch:saveBranch,onAddBranch:addBranch,onDeleteBranch:deleteBranch,onDecision:(r,s)=>decision(r,s,"advance"),onLeaveDecision:(r,s)=>decision(r,s,"leave"),onUpdateAttendance:updateAttendance,onRepairPhotos:repairAllEmployeePhotos,onRepairAttendance:repairAttendanceHistory,onRepairPayroll:repairImportedPayroll,notifications,onNotificationOpen:openNotification,onManageAdvance:manageAdvance,onRestoreEmployee:restoreEmployee,onCleanupEmployeeData:cleanupEmployeeData,onClearCurrentArchive:clearCurrentArchive,onMigratePhotos:migratePhotosOutOfEmployees,onLoadSection:(section)=>loadHeavy(session,section),onSavePayrollAdjustment:savePayrollAdjustment,onSupervisorCheckout:supervisorCheckout}):h(Employee,{user:profile,branch,branches,attendance:attendance.filter(a=>employeeMatchesRecord(profile,a)),advances:advances.filter(a=>employeeMatchesRecord(profile,a)),leaves:leaves.filter(a=>employeeMatchesRecord(profile,a)),payrollAdjustment:payrollAdjustments.find(x=>employeeMatchesRecord(profile,x)&&String(x.month||"")===monthKey(today()))||null,notifications,onNotificationOpen:openNotification,onAttendance:addAttendance,onAdvance:addAdvance,onSettlement:addSettlement,onLeave:addLeave,onLogout:logout,token:session.idToken})}
 class AppErrorBoundary extends React.Component{
   constructor(props){super(props);this.state={error:null};}
