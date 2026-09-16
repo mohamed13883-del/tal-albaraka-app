@@ -511,7 +511,57 @@ function Employee({user,branch,branches,attendance,advances,leaves,payrollAdjust
  }
  if(tab==="advances"){
   const allAdvances=(advances||[]).slice().sort((a,b)=>String(b.requestDate||"").localeCompare(String(a.requestDate||"")));
-  content=h("div",{className:"grid md:grid-cols-2 gap-4"},h(Card,null,h("h2",{className:"font-black text-xl mb-3"},"طلب سلفة"),blockingAdvance?h("div",{className:"pill rounded-2xl p-4 mb-3 border border-amber-300/20 bg-amber-400/10"},h("div",{className:"font-bold text-amber-200"},"لديك سلفة قائمة بالفعل"),h("div",{className:"muted text-sm mt-1"},blockingAdvance.status==="pending"?"تم تقديم طلب السلفة وهو قيد المراجعة. لا يمكن تقديم طلب جديد حتى يتم الرد عليه.":"السلفة الحالية لم تُغلق بعد. لا يمكن تقديم طلب جديد حتى يتم سدادها وإغلاقها.")):h("div",{className:"space-y-3"},h("input",{className:"field",type:"number",min:"1",placeholder:"مبلغ السلفة",value:adv,onChange:e=>setAdv(e.target.value)}),h("select",{className:"field",value:inst,onChange:e=>setInst(e.target.value)},Array.from({length:11},(_,i)=>{const n=i+2;return h("option",{key:n,value:String(n)},`${n} أشهر`)})),h(Btn,{disabled:!!blockingAdvance,onClick:()=>{const n=Math.max(2,Math.min(12,Number(inst)||2));if(Number(adv)>0){onAdvance({amount:Number(adv),installments:n});setAdv("")}},children:"إرسال الطلب"}))),h(Card,null,h("h2",{className:"font-black text-xl mb-3"},"السلف وسجل الإجراءات")),allAdvances.length?allAdvances.map(a=>{const hist=advanceHistory(a),rem=remaining(a),status=a.status==="approved"?"نشطة":a.status==="pending"?"قيد المراجعة":a.status==="rejected"?"مرفوضة":"مغلقة";return h("div",{id:`request-advance-${a.id}`,key:a.id,className:"pill rounded-2xl p-4 mb-3"},[h("div",{className:"flex flex-wrap justify-between gap-3"},[h("div",null,h("div",{className:"font-bold"},`سلفة ${money(a.amount)}`),h("div",{className:"muted text-sm mt-1"},`الحالة: ${status} • المتبقي: ${money(rem)} ريال`),h("div",{className:"text-xs muted mt-1"},`الأقساط: ${a.installmentsCount||0} • القسط الحالي: ${money(a.installmentAmount||0)} • المسدد: ${money(a.paidAmount||0)} ريال`)),a.status==="approved"&&rem>0?(a.settlementRequest?.status==="pending"?h(Badge,{tone:"amber",children:"طلب سداد قيد المراجعة"}):h(Btn,{kind:"secondary",onClick:()=>setSettle(a),children:"طلب سداد المتبقي"})):null]),h("div",{className:"mt-3 rounded-xl bg-black/10 p-3"},h("div",{className:"font-bold text-sm mb-2"},"سجل السلفة"),hist.map((x,i)=>h("div",{key:i,className:"border-b border-white/10 last:border-0 py-2 text-xs"},h("div",{className:"font-bold"},advanceActionLabel(x.action)),h("div",{className:"muted mt-1"},`${x.date||"—"} • ${x.by||"النظام"}`),x.amount!=null&&h("div",{className:"mt-1"},`المبلغ: ${money(x.amount)} ريال`),x.action==="resplit"&&h("div",{className:"mt-1"},`المتبقي: ${money(x.remainingBalance)} ريال • ${x.installments||0} أقساط`))))])}):h("div",{className:"muted"},"لا توجد سلف مسجلة")));
+  content=h("div",{className:"grid md:grid-cols-1 lg:grid-cols-2 gap-4"},
+   h(Card,null,
+    h("h2",{className:"font-black text-xl mb-3"},"طلب سلفة"),
+    blockingAdvance
+      ? h("div",{className:"pill rounded-2xl p-4 mb-3 border border-amber-300/20 bg-amber-400/10"},
+          h("div",{className:"font-bold text-amber-200"},"لديك سلفة قائمة بالفعل"),
+          h("div",{className:"muted text-sm mt-1"},blockingAdvance.status==="pending"
+            ? "تم تقديم طلب السلفة وهو قيد المراجعة. لا يمكن تقديم طلب جديد حتى يتم الرد عليه."
+            : "السلفة الحالية لم تُغلق بعد. لا يمكن تقديم طلب جديد حتى يتم سدادها وإغلاقها."))
+      : h("div",{className:"space-y-3"},
+          h("input",{className:"field",type:"number",min:"1",placeholder:"مبلغ السلفة",value:adv,onChange:e=>setAdv(e.target.value)}),
+          h("select",{className:"field",value:inst,onChange:e=>setInst(e.target.value)},
+            Array.from({length:11},(_,i)=>{const n=i+2;return h("option",{key:n,value:String(n)},`${n} أشهر`)})),
+          h(Btn,{disabled:!!blockingAdvance,onClick:()=>{
+            const n=Math.max(2,Math.min(12,Number(inst)||2));
+            if(Number(adv)>0){onAdvance({amount:Number(adv),installments:n});setAdv("")}
+          },children:"إرسال الطلب"})
+      )
+   ),
+   h(Card,null,
+    h("h2",{className:"font-black text-xl mb-3"},"السلف وسجل الإجراءات"),
+    allAdvances.length
+      ? allAdvances.map(a=>{
+          const hist=advanceHistory(a),rem=remaining(a),status=a.status==="approved"?"نشطة":a.status==="pending"?"قيد المراجعة":a.status==="rejected"?"مرفوضة":"مغلقة";
+          return h("div",{id:`request-advance-${a.id}`,key:a.id,className:"pill rounded-2xl p-4 mb-3"},[
+            h("div",{className:"flex flex-wrap justify-between gap-3"},[
+              h("div",null,
+                h("div",{className:"font-bold"},`سلفة ${money(a.amount)}`),
+                h("div",{className:"muted text-sm mt-1"},`الحالة: ${status} • المتبقي: ${money(rem)} ريال`),
+                h("div",{className:"text-xs muted mt-1"},`الأقساط: ${a.installmentsCount||0} • القسط الحالي: ${money(a.installmentAmount||0)} • المسدد: ${money(a.paidAmount||0)} ريال`)
+              ),
+              a.status==="approved"&&rem>0
+                ? (a.settlementRequest?.status==="pending"
+                    ? h(Badge,{tone:"amber",children:"طلب سداد قيد المراجعة"})
+                    : h(Btn,{kind:"secondary",onClick:()=>setSettle(a),children:"طلب سداد المتبقي"}))
+                : null
+            ]),
+            h("div",{className:"mt-3 rounded-xl bg-black/10 p-3"},
+              h("div",{className:"font-bold text-sm mb-2"},"سجل السلفة"),
+              hist.map((x,i)=>h("div",{key:i,className:"border-b border-white/10 last:border-0 py-2 text-xs"},
+                h("div",{className:"font-bold"},advanceActionLabel(x.action)),
+                h("div",{className:"muted mt-1"},`${x.date||"—"} • ${x.by||"النظام"}`),
+                x.amount!=null&&h("div",{className:"mt-1"},`المبلغ: ${money(x.amount)} ريال`),
+                x.action==="resplit"&&h("div",{className:"mt-1"},`المتبقي: ${money(x.remainingBalance)} ريال • ${x.installments||0} أقساط`)
+              ))
+            )
+          ]);
+        })
+      : h("div",{className:"muted"},"لا توجد سلف مسجلة")
+   )
+  );
  }
  if(tab==="leaves"){
   content=h(Card,null,h("h2",{className:"font-black text-xl mb-3"},"طلبات الإجازات"),h("div",{className:"grid sm:grid-cols-2 gap-3"},h("select",{className:"field",value:leave.type,onChange:e=>setLeave({...leave,type:e.target.value})},h("option",{value:"annual"},"سنوية"),h("option",{value:"sick"},"مرضية"),h("option",{value:"casual"},"عارضة")),h("input",{className:"field",type:"date",value:leave.start,onChange:e=>setLeave({...leave,start:e.target.value})}),h("input",{className:"field",type:"date",value:leave.end,onChange:e=>setLeave({...leave,end:e.target.value})}),h("input",{className:"field sm:col-span-2",placeholder:"السبب",value:leave.reason,onChange:e=>setLeave({...leave,reason:e.target.value})}),h(Btn,{onClick:()=>onLeave({...leave,days:daysBetween(leave.start,leave.end),requestDate:today()}),children:"إرسال طلب الإجازة"})),h("div",{className:"mt-4"},leaves.map(x=>h("div",{id:`request-leave-${x.id}`,key:x.id,className:"pill rounded-xl p-3 mb-2 flex justify-between"},h("span",null,`${x.start} → ${x.end}`),h(Badge,{tone:x.status==="approved"?"green":x.status==="rejected"?"red":"amber",children:x.status==="approved"?"موافق":x.status==="rejected"?"مرفوض":"قيد المراجعة"})))));
