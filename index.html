@@ -166,7 +166,7 @@ const LOGO = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0Z
 const FIREBASE_API_KEY = "AIzaSyB6kleNEq_qopMOjtvhtGZKfhf-Ud7OaEk";
 const DB_URL = "https://tal-albaraka-default-rtdb.asia-southeast1.firebasedatabase.app";
 // نظام السلف الجديد: نفصل التخزين عن النظام القديم حتى لا تتداخل أو تظهر أي سجلات سابقة.
-const ADVANCE_SYSTEM_VERSION = "3.0.0";
+const ADVANCE_SYSTEM_VERSION = "4.0.0";
 const ADVANCE_STORE = "advances";
 const ADVANCE_REQUEST_STORE = "advanceRequests";
 const ADVANCE_INBOX_STORE = "advanceInbox";
@@ -896,7 +896,7 @@ function Admin({profile,token,employees,branches,attendance,advances,leaves,loca
   content=h(React.Fragment,null,[
    h(Card,{className:"border border-cyan-400/20"},[
     h("div",{className:"flex flex-col lg:flex-row justify-between gap-4"},[
-      h("div",null,h("div",{className:"flex items-center gap-2"},h("h2",{className:"font-black text-2xl"},"نظام السلف — الإصدار الجديد"),h(Badge,{tone:"green",children:"V2"})),h("div",{className:"muted text-sm mt-1"},"نظام مستقل عن بيانات السلف القديمة: طلب • موافقة/رفض • إشعار مباشر • أقساط • سداد مبكر • سجل حركة كامل.")),
+      h("div",null,h("div",{className:"flex items-center gap-2"},h("h2",{className:"font-black text-2xl"},"نظام السلف — الإصدار الجديد"),h(Badge,{tone:"green",children:"V4"})),h("div",{className:"muted text-sm mt-1"},"نظام مستقل عن بيانات السلف القديمة: طلب • موافقة/رفض • إشعار مباشر • أقساط • سداد مبكر • سجل حركة كامل.")),
       null
     ]),
     h("div",{className:"grid grid-cols-2 md:grid-cols-4 gap-3 mt-4"},[["طلبات معلقة",pending.length],["سلف نشطة",activeAdv.length],["طلبات سداد",pendingSettlements.length],["مغلقة/مرفوضة",closed.length+rejected.length]].map(x=>h("div",{key:x[0],className:"stat rounded-2xl p-3"},h("div",{className:"muted text-xs"},x[0]),h("div",{className:"text-2xl font-black mt-1"},x[1]))))
@@ -1194,6 +1194,7 @@ const loadHeavy=useCallback(async(s,section="all")=>{
   const as=attReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
   const todayAs=todayReads.flatMap(x=>x.status==="fulfilled"&&x.value?[x.value]:[]);
   const avs=advReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]).filter(x=>String(x.systemVersion||"")===ADVANCE_SYSTEM_VERSION);
+  try{Object.keys(localStorage).filter(k=>k.startsWith("tal_pending_advance_")).forEach(k=>{try{const v=JSON.parse(localStorage.getItem(k)||"null");if(v&&String(v.employeeId)===String(s.uid)&&String(v.systemVersion)===ADVANCE_SYSTEM_VERSION)avs.push(v)}catch(_){}})}catch(_){}
   const advanceMap=new Map();
   avs.forEach(x=>{const k=String(x.id||`${x.requestDate||""}|${x.amount||0}|${x.employeeId||""}`);const prev=advanceMap.get(k);if(!prev||Number(x.updatedAt||x.createdAt||0)>Number(prev.updatedAt||prev.createdAt||0))advanceMap.set(k,x);});
   const ls=leaveReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
@@ -1329,14 +1330,27 @@ const addAdvance=async({amount,installments})=>{
  const existing=(advances||[]).find(a=>employeeMatchesRecord(profile,a)&&["pending","approved"].includes(String(a.status||""))&&Number(a.remainingBalance??((a.remainingInstallments||0)*(a.installmentAmount||0)))>0);
  if(existing){alert(existing.status==="pending"?"تم تقديم طلب السلفة وهو قيد المراجعة، ولا يمكن تقديم طلب جديد حتى يتم الرد عليه.":"لديك سلفة قائمة ولم تُغلق بعد. لا يمكن تقديم طلب جديد حتى يتم سدادها وإغلاقها.");return false;}
  const n=Math.max(2,Math.min(12,Number(installments)||2)),numericAmount=Number(amount)||0;if(!(numericAmount>0))return false;
- const id=uid(),requestDate=today(),authUid=profile?.authUid||session.uid;
- const r={id,employeeId:canonicalId,authUid,employeeName:profile?.name||"",employeeEmail:profile?.email||session.email||"",advanceId:id,systemVersion:ADVANCE_SYSTEM_VERSION,amount:numericAmount,installmentsCount:n,installmentAmount:Math.round(numericAmount/n*100)/100,remainingInstallments:n,remainingBalance:numericAmount,paidAmount:0,status:"pending",requestDate,createdAt:Date.now(),managementHistory:[{action:"request",date:requestDate,by:profile?.name||"الموظف",amount:numericAmount,installments:n}]};
- const keys=[canonicalId,session.uid,authUid].filter((v,i,arr)=>v&&arr.indexOf(v)===i);
- const writes=await Promise.allSettled(keys.map(key=>fbPut(`${ADVANCE_STORE}/${encodeURIComponent(key)}/${id}`,{...r,employeeId:key,authUid},session.idToken)));
- if(!writes.some(x=>x.status==="fulfilled")){console.error("Advance save failed: all storage writes were rejected");return false;}
+ const id=uid(),requestDate=today(),authUid=profile?.authUid||session.uid,createdAt=Date.now();
+ const r={id,employeeId:canonicalId,authUid,employeeName:profile?.name||"",employeeEmail:profile?.email||session.email||"",advanceId:id,systemVersion:ADVANCE_SYSTEM_VERSION,requestType:"advance",amount:numericAmount,installmentsCount:n,installmentAmount:Math.round(numericAmount/n*100)/100,remainingInstallments:n,remainingBalance:numericAmount,paidAmount:0,status:"pending",requestDate,createdAt,updatedAt:createdAt,managementHistory:[{action:"request",date:requestDate,by:profile?.name||"الموظف",amount:numericAmount,installments:n}]};
+ const keys=[session.uid,canonicalId,authUid].filter((v,i,arr)=>v&&arr.indexOf(String(v))===i).map(String);
+ let saved=false;
+ for(const key of keys){
+  try{
+   const path=`${ADVANCE_STORE}/${encodeURIComponent(key)}/${encodeURIComponent(id)}`;
+   await fbPut(path,{...r,employeeId:key,authUid});
+   const verify=await fbGet(path,session.idToken);
+   if(verify&&String(verify.id)===String(id)){saved=true;break;}
+  }catch(e){console.warn("advance write failed",key,e?.message||e)}
+ }
+ if(!saved){
+  try{localStorage.setItem(`tal_pending_advance_${id}`,JSON.stringify(r));}catch(_){}
+  console.error("Advance save failed: no Firebase path accepted the request");
+  return false;
+ }
  try{await fbPut(`${ADVANCE_REQUEST_STORE}/${encodeURIComponent(id)}`,r,session.idToken);}catch(_){ }
+ try{localStorage.removeItem(`tal_pending_advance_${id}`);}catch(_){}
  setAdvances(a=>[...a.filter(x=>String(x.id)!==String(id)),r]);
- await notifySupervisors("advance",{employeeName:r.employeeName,amount:numericAmount,installments:n,requestDate,id,requestId:id,employeeId:canonicalId,authUid});
+ await notifySupervisors("advance",{employeeName:r.employeeName,amount:numericAmount,installments:n,requestDate,id,requestId:id,advanceId:id,employeeId:canonicalId,authUid,systemVersion:ADVANCE_SYSTEM_VERSION});
  return true;
 };const addSettlement=async(a,{amount})=>{
  if(!amount)return false;
