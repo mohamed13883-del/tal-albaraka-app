@@ -857,7 +857,7 @@ function Admin({profile,token,employees,branches,attendance,advances,leaves,loca
  const input=(key,ph,type="text")=>h("input",{className:"field",placeholder:ph,type,value:newE[key],onChange:e=>setNewE({...newE,[key]:e.target.value})});
  let content=null;
  if(tab==="home"){
-  const stats=[["عدد الموظفين",active.length],["حضور اليوم",attendance.filter(a=>recordDate(a)===today()&&(a.checkInTime||a.checkIn||a.inTime||a.clockIn)).length],["طلبات سداد السلف",pendingSettlements.length],["مخالفات الموقع",locationIncidents.filter(x=>x.status==="blocked").length],["الساعات الإضافية",attendance.reduce((sum,a)=>sum+toNum(a.overtimeHours),0).toFixed(2)]];
+  const pendingAdvances=advances.filter(a=>String(a.status||"")==="pending").length;const pendingLeaves=leaves.filter(a=>String(a.status||"")==="pending").length;const missingCheckout=attendance.filter(a=>recordDate(a)===today()&&(a.checkInTime||a.checkIn)&&!(a.checkOutTime||a.checkOut||a.outTime||a.clockOut)).length;const stats=[["عدد الموظفين",active.length],["حضور اليوم",attendance.filter(a=>recordDate(a)===today()&&(a.checkInTime||a.checkIn||a.inTime||a.clockIn)).length],["طلبات السلف",pendingAdvances],["طلبات الإجازات",pendingLeaves],["انصراف غير مسجل",missingCheckout],["طلبات سداد السلف",pendingSettlements.length],["مخالفات الموقع",locationIncidents.filter(x=>x.status==="blocked").length],["الساعات الإضافية",formatHours(attendance.reduce((sum,a)=>sum+toNum(a.overtimeHours),0))]];
   content=h(React.Fragment,null,[
     h("div",{className:"hero rounded-3xl p-5"},[h("div",{className:"muted"},"لوحة تحكم المشرف"),h("div",{className:"text-3xl font-black mt-2"},"معًا نحو إدارة أفضل"),h("div",{className:"muted mt-1"},"الحضور • الساعات • السلف • إدارة الموظفين")]),
     h("div",{className:"grid sm:grid-cols-2 xl:grid-cols-5 gap-4"},stats.map(x=>h(Card,{key:x[0],className:"stat"},[h("div",{className:"muted text-xs"},x[0]),h("div",{className:"text-2xl font-black mt-1"},x[1])]))),
@@ -1057,6 +1057,14 @@ function flattenNotifications(obj){
   walk(obj);
   return out;
 }
+async function writeAudit(token,event){
+ try{
+  const id=uid();
+  const clean={id,createdAt:Date.now(),...event};
+  await fbPut(`auditLogs/${encodeURIComponent(id)}`,clean,token);
+  return true;
+ }catch(e){console.warn("audit log unavailable",e?.message||e);return false;}
+}
 function startFirebaseStream(path,token,onChange){
   if(!window.EventSource||!token)return ()=>{};
   let closed=false; const es=new EventSource(`${DB_URL}/${path}.json?auth=${encodeURIComponent(token)}`);
@@ -1071,10 +1079,10 @@ function App(){const[session,setSession]=useState(null),[profile,setProfile]=use
   const direct=await Promise.allSettled([fbGet(`notifications/${encodeURIComponent(s.uid)}`,t)]);
   direct.forEach(r=>{if(r.status==="fulfilled"&&r.value)rows.push(...flatten(r.value));});
   // لا نعرض أي إشعار سلفة من النظام القديم. الإجازات وباقي الإشعارات تستمر طبيعيًا.
-  for(let i=rows.length-1;i>=0;i--){const typ=String(rows[i]?.type||"").toLowerCase();if((typ==="advance"||typ==="settlement"||typ==="settlementrequest")&&rows[i]?.systemVersion!==ADVANCE_SYSTEM_VERSION&&rows[i]?.payload?.systemVersion!==ADVANCE_SYSTEM_VERSION)rows.splice(i,1);}
+  
   if(isManagementRole(s.role)){
    const [av,inbox]=await Promise.allSettled([fbGet(ADVANCE_STORE,t),fbGet(ADVANCE_INBOX_STORE,t)]);
-   const raw=(av.status==="fulfilled"&&av.value?flatten(av.value):[]).filter(x=>String(x.systemVersion||"")===ADVANCE_SYSTEM_VERSION);
+   const raw=(av.status==="fulfilled"&&av.value?flatten(av.value):[]);
    const inboxRaw=inbox.status==="fulfilled"&&inbox.value?flatten(inbox.value):[];
    const logical=new Map();
    raw.filter(a=>String(a.status||"")==="pending").forEach(a=>{
@@ -1176,7 +1184,7 @@ const loadHeavy=useCallback(async(s,section="all")=>{
     const want=new Set(section==="all"?["attendance","advances","leaves","locationIncidents","payrollAdjustments"]:section==="home"?["attendance","advances","locationIncidents"]:section==="reports"?["attendance","advances","payrollAdjustments"]:section==="attendance"?["attendance"]:section==="advances"?["advances"]:section==="leaves"?["leaves"]:[]);
     const jobs=[];
     if(want.has("attendance"))jobs.push(fbGet("attendance",t).then(v=>setAttendance(flatten(v))).catch(e=>{throw e}));
-    if(want.has("advances"))jobs.push(Promise.allSettled([fbGet(ADVANCE_STORE,t),fbGet(ADVANCE_REQUEST_STORE,t)]).then(rs=>{const rows=[];rs.forEach(r=>{if(r.status==="fulfilled"&&r.value)rows.push(...flatten(r.value));});const currentRows=rows.filter(x=>String(x.systemVersion||"")===ADVANCE_SYSTEM_VERSION);const map=new Map();currentRows.forEach(x=>{const k=String(x.id||`${x.employeeId||""}|${x.requestDate||""}|${x.amount||0}`);const prev=map.get(k);if(!prev||Number(x.updatedAt||x.createdAt||0)>=Number(prev.updatedAt||prev.createdAt||0))map.set(k,x);});setAdvances([...map.values()]);}).catch(e=>{throw e}));
+    if(want.has("advances"))jobs.push(Promise.allSettled([fbGet(ADVANCE_STORE,t),fbGet(ADVANCE_REQUEST_STORE,t)]).then(rs=>{const rows=[];rs.forEach(r=>{if(r.status==="fulfilled"&&r.value)rows.push(...flatten(r.value));});const currentRows=rows;const map=new Map();currentRows.forEach(x=>{const k=String(x.id||`${x.employeeId||""}|${x.requestDate||""}|${x.amount||0}`);const prev=map.get(k);if(!prev||Number(x.updatedAt||x.createdAt||0)>=Number(prev.updatedAt||prev.createdAt||0))map.set(k,x);});setAdvances([...map.values()]);}).catch(e=>{throw e}));
     if(want.has("leaves"))jobs.push(fbGet("leaves",t).then(v=>setLeaves(flatten(v))).catch(e=>{throw e}));
     if(want.has("locationIncidents"))jobs.push(fbGet("locationIncidents",t).then(v=>setLocationIncidents(flatten(v))).catch(()=>setLocationIncidents([])));
     if(want.has("payrollAdjustments"))jobs.push(fbGet("payrollAdjustments",t).then(v=>{const out=[];Object.entries(v||{}).forEach(([eid,months])=>Object.entries(months||{}).forEach(([month,val])=>{if(val&&typeof val==="object")out.push({...val,employeeId:val.employeeId||eid,month:String(val.month||month)});}));setPayrollAdjustments(out)}).catch(()=>setPayrollAdjustments([])));
@@ -1193,8 +1201,8 @@ const loadHeavy=useCallback(async(s,section="all")=>{
   const todayReads=await Promise.allSettled(keys.map(k=>fbGet(`attendance/${k}/${today()}`,t)));
   const as=attReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
   const todayAs=todayReads.flatMap(x=>x.status==="fulfilled"&&x.value?[x.value]:[]);
-  const avs=advReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]).filter(x=>String(x.systemVersion||"")===ADVANCE_SYSTEM_VERSION);
-  try{Object.keys(localStorage).filter(k=>k.startsWith("tal_pending_advance_")).forEach(k=>{try{const v=JSON.parse(localStorage.getItem(k)||"null");if(v&&String(v.employeeId)===String(s.uid)&&String(v.systemVersion)===ADVANCE_SYSTEM_VERSION)avs.push(v)}catch(_){}})}catch(_){}
+  const avs=advReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
+  try{Object.keys(localStorage).filter(k=>k.startsWith("tal_pending_advance_")).forEach(k=>{try{const v=JSON.parse(localStorage.getItem(k)||"null");if(v&&String(v.employeeId)===String(s.uid))avs.push(v)}catch(_){}})}catch(_){}
   const advanceMap=new Map();
   avs.forEach(x=>{const k=String(x.id||`${x.requestDate||""}|${x.amount||0}|${x.employeeId||""}`);const prev=advanceMap.get(k);if(!prev||Number(x.updatedAt||x.createdAt||0)>Number(prev.updatedAt||prev.createdAt||0))advanceMap.set(k,x);});
   const ls=leaveReads.flatMap(x=>x.status==="fulfilled"&&x.value?flatten(x.value):[]);
@@ -1298,7 +1306,7 @@ const logout=()=>{setSession(null);setProfile(null);localStorage.removeItem("tal
 };
 const notifyEmployee=async(employeeId,authUid,data)=>{try{const keys=[employeeId,authUid].filter((v,i,a)=>v&&a.indexOf(v)===i);for(const key of keys)await fbPut(`notifications/${encodeURIComponent(key)}/${data.id}`,data,session.idToken);return true}catch(e){return false}};
 const resetLegacyAdvances=async()=>false;
-const updateAttendance=async(r)=>{const nb=recordBranch(r,employees.find(e=>employeeMatchesRecord(e,r)),branches);const m=shiftMetrics(r,nb);const oldId=r._oldEmployeeId||r.employeeId,oldDate=r._oldDate||r.date;const clean={...r};delete clean._oldEmployeeId;delete clean._oldDate;Object.assign(clean,{date:dateKey(r.date),employeeId:r.employeeId,branchId:nb.id,branchName:nb.name,branchLat:Number(nb.lat),branchLng:Number(nb.lng),branchRadiusMeters:Math.max(10,Math.min(5000,Number(nb.radiusMeters)||300)),branchShiftStart:nb.shiftStart,branchShiftEnd:nb.shiftEnd,requiredHours:Math.max(0.25,Number(nb.requiredHours)||8),workHours:m.work,overtimeHours:m.ot,overtimeBefore:m.otBefore,overtimeAfter:m.otAfter,verified:true});if(String(oldId)!==String(r.employeeId)||String(oldDate)!==String(r.date))await fbDelete(`attendance/${oldId}/${oldDate}`,session.idToken);await fbPut(`attendance/${r.employeeId}/${r.date}`,clean,session.idToken);setAttendance(a=>[...a.filter(x=>!(String(x.employeeId)===String(oldId)&&String(x.date)===String(oldDate))&&!(String(x.employeeId)===String(r.employeeId)&&String(x.date)===String(r.date))),clean])};
+const updateAttendance=async(r)=>{const nb=recordBranch(r,employees.find(e=>employeeMatchesRecord(e,r)),branches);const m=shiftMetrics(r,nb);const oldId=r._oldEmployeeId||r.employeeId,oldDate=r._oldDate||r.date;const clean={...r};delete clean._oldEmployeeId;delete clean._oldDate;Object.assign(clean,{date:dateKey(r.date),employeeId:r.employeeId,branchId:nb.id,branchName:nb.name,branchLat:Number(nb.lat),branchLng:Number(nb.lng),branchRadiusMeters:Math.max(10,Math.min(5000,Number(nb.radiusMeters)||300)),branchShiftStart:nb.shiftStart,branchShiftEnd:nb.shiftEnd,requiredHours:Math.max(0.25,Number(nb.requiredHours)||8),workHours:m.work,overtimeHours:m.ot,overtimeBefore:m.otBefore,overtimeAfter:m.otAfter,verified:true});if(String(oldId)!==String(r.employeeId)||String(oldDate)!==String(r.date))await fbDelete(`attendance/${oldId}/${oldDate}`,session.idToken);await fbPut(`attendance/${r.employeeId}/${r.date}`,clean,session.idToken);await writeAudit(session.idToken,{action:"attendance_corrected",entity:"attendance",employeeId:r.employeeId,employeeName:r.employeeName||"",date:r.date,details:{oldEmployeeId:oldId,oldDate,checkInTime:r.checkInTime||"",checkOutTime:r.checkOutTime||"",workHours:m.work,overtimeHours:m.ot,by:profile?.name||"المشرف"}});setAttendance(a=>[...a.filter(x=>!(String(x.employeeId)===String(oldId)&&String(x.date)===String(oldDate))&&!(String(x.employeeId)===String(r.employeeId)&&String(x.date)===String(r.date))),clean])};
 const supervisorCheckout=async(a)=>{
  const emp=employees.find(e=>employeeMatchesRecord(e,a));
  const nb=recordBranch(a,emp,branches);
@@ -1350,6 +1358,7 @@ const addAdvance=async({amount,installments})=>{
  try{await fbPut(`${ADVANCE_REQUEST_STORE}/${encodeURIComponent(id)}`,r,session.idToken);}catch(_){ }
  try{localStorage.removeItem(`tal_pending_advance_${id}`);}catch(_){}
  setAdvances(a=>[...a.filter(x=>String(x.id)!==String(id)),r]);
+ await writeAudit(session.idToken,{action:"advance_requested",entity:"advance",requestId:id,employeeId:canonicalId,employeeName:r.employeeName,details:{amount:numericAmount,installments:n,installmentAmount:r.installmentAmount}});
  await notifySupervisors("advance",{employeeName:r.employeeName,amount:numericAmount,installments:n,requestDate,id,requestId:id,advanceId:id,employeeId:canonicalId,authUid,systemVersion:ADVANCE_SYSTEM_VERSION});
  return true;
 };const addSettlement=async(a,{amount})=>{
@@ -1367,7 +1376,18 @@ const addAdvance=async({amount,installments})=>{
  setAdvances(x=>x.map(y=>y.id===a.id?{...y,...patch}:y));
  await notifySupervisors("settlement",{employeeName:profile?.name||"",amount:numeric,requestId:req.id,advanceId:a.id,id:req.id,employeeId:profile?.id||session.uid,authUid:profile?.authUid||session.uid,requestDate:req.date,systemVersion:ADVANCE_SYSTEM_VERSION});
  return true;
-};const addLeave=async(x)=>{const id=uid(),r={...x,id,employeeId:session.uid,status:"pending"};await fbPut(`leaves/${session.uid}/${id}`,r,session.idToken);setLeaves(a=>[...a,r]);await notifySupervisors("leave",{employeeName:profile?.name||"",type:r.type,start:r.start||r.startDate,end:r.end||r.endDate,days:r.days,reason:r.reason||"",requestId:id,id,employeeId:session.uid})};const updateEmp=async(id,p)=>{
+};const addLeave=async(x)=>{
+ const start=x.start||x.startDate||today(),end=x.end||x.endDate||start,days=Math.max(1,Number(x.days)||daysBetween(start,end));
+ if(end<start){alert("تاريخ نهاية الإجازة يجب أن يكون بعد أو مساويًا لتاريخ البداية.");return false;}
+ const id=uid(),r={...x,id,employeeId:profile?.id||session.uid,authUid:profile?.authUid||session.uid,employeeName:profile?.name||"",start,end,days,status:"pending",requestDate:today(),createdAt:Date.now(),updatedAt:Date.now()};
+ const keys=[session.uid,profile?.id,profile?.authUid,profile?.employeeId,profile?.legacyEmployeeId].filter((v,i,a)=>v&&a.indexOf(String(v))===i).map(String);
+ const writes=await Promise.allSettled(keys.map(key=>fbPut(`leaves/${encodeURIComponent(key)}/${encodeURIComponent(id)}`,{...r,employeeId:key},session.idToken)));
+ if(!writes.some(x=>x.status==="fulfilled")){console.error("Leave save failed");return false;}
+ setLeaves(a=>[...a.filter(v=>String(v.id)!==String(id)),r]);
+ await writeAudit(session.idToken,{action:"leave_requested",entity:"leave",requestId:id,employeeId:r.employeeId,employeeName:r.employeeName,details:{type:r.type,start,end,days}});
+ await notifySupervisors("leave",{employeeName:r.employeeName,type:r.type,start:r.start,end:r.end,days:r.days,reason:r.reason||"",requestId:id,id,employeeId:r.employeeId,authUid:r.authUid});
+ return true;
+};const updateEmp=async(id,p)=>{
  const old=employees.find(x=>String(x.id)===String(id));
  if(!old||String(old.role||"").toLowerCase()==="admin"){throw Error("لا يمكن تعديل حساب مشرف من شاشة الموظفين.");}
  const photoField=Object.prototype.hasOwnProperty.call(p||{},"photoData");
@@ -1477,6 +1497,7 @@ const manageAdvance=async(a,change)=>{
   const history=[...(r.managementHistory||[]),{action:st==="approved"?"settlementApproved":"settlementRejected",date:today(),by:profile?.name||"المشرف",amount:Number(req.amount)||0,settlementRequestId:req.id,...(st==="rejected"?{reason:String(reason||"").trim()}: {})}];
   const patch={settlementRequest:req,managementHistory:history,updatedAt:Date.now(),systemVersion:ADVANCE_SYSTEM_VERSION};
   if(st==="approved")Object.assign(patch,{remainingInstallments:0,remainingBalance:0,status:"closed",closedAt:Date.now(),closedBy:profile?.name||"المشرف"});
+  await writeAudit(session.idToken,{action:`settlement_${st}`,entity:"settlement",requestId:req.id,advanceId:r.id,employeeId:r.employeeId,employeeName:r.employeeName||employees.find(e=>employeeMatchesRecord(e,r))?.name||"",details:{amount:req.amount||0,reason:req.rejectionReason||"",by:profile?.name||"المشرف"}});
   const keys=[r.employeeId,r.authUid,r.uid,r.userId,r.employeeKey,r.legacyEmployeeId].filter((v,i,arr)=>v&&arr.indexOf(v)===i).map(String);
   await Promise.allSettled(keys.map(key=>fbPatch(`${ADVANCE_STORE}/${encodeURIComponent(key)}/${encodeURIComponent(r.id)}`,patch,session.idToken)));
   try{await fbPatch(`${ADVANCE_REQUEST_STORE}/${encodeURIComponent(r.id)}`,patch,session.idToken);}catch(_){ }
@@ -1484,11 +1505,12 @@ const manageAdvance=async(a,change)=>{
   try{const nid=uid();await notifyEmployee(r.employeeId,r.authUid,{id:nid,title:"تحديث طلب السداد",message:st==="approved"?"تمت الموافقة على طلب سداد المتبقي من السلفة.":`تم رفض طلب سداد المتبقي من السلفة. السبب: ${String(reason||"").trim()}`,type:"settlement",target:"advances",action:"review-settlement",createdAt:Date.now(),read:false,requestId:String(req.id||r.id),advanceId:String(r.id),status:st,payload:{requestId:String(req.id||r.id),advanceId:String(r.id),id:String(r.id),rejectionReason:String(reason||"").trim(),target:"advances",action:"review-settlement",systemVersion:ADVANCE_SYSTEM_VERSION},systemVersion:ADVANCE_SYSTEM_VERSION})}catch(e){}return;
  }
  const path=type==="leave"?"leaves":"advances",isRejected=status==="rejected",reasonText=String(reason||"").trim(),history=type==="advance"?[...(r.managementHistory||[]),{action:status==="approved"?"approved":"rejected",date:today(),by:profile?.name||"المشرف",amount:Number(r.amount)||0,...(isRejected?{reason:reasonText}:{})}]:null;
- const patch=type==="advance"?{status,managementHistory:history,updatedAt:Date.now(),systemVersion:ADVANCE_SYSTEM_VERSION,...(isRejected?{rejectionReason:reasonText,rejectedAt:Date.now(),rejectedBy:profile?.name||"المشرف"}:{})}:{status,...(isRejected?{rejectionReason:reasonText,rejectedAt:Date.now(),rejectedBy:profile?.name||"المشرف"}:{})};
+ const patch=type==="advance"?{status,managementHistory:history,updatedAt:Date.now(),systemVersion:ADVANCE_SYSTEM_VERSION,...(status==="approved"?{disbursedAt:Date.now(),disbursedBy:profile?.name||"المشرف",disbursementStatus:"paid"}:{ } ),...(isRejected?{rejectionReason:reasonText,rejectedAt:Date.now(),rejectedBy:profile?.name||"المشرف"}:{})}:{status,...(isRejected?{rejectionReason:reasonText,rejectedAt:Date.now(),rejectedBy:profile?.name||"المشرف"}:{})};
  const keys=[r.employeeId,r.authUid,r.uid,r.userId,r.employeeKey,r.legacyEmployeeId].filter((v,i,arr)=>v&&arr.indexOf(v)===i).map(String);
  await Promise.allSettled(keys.map(key=>fbPatch(`${path}/${encodeURIComponent(key)}/${encodeURIComponent(r.id)}`,patch,session.idToken)));
  if(type==="advance")try{await fbPatch(`${ADVANCE_REQUEST_STORE}/${encodeURIComponent(r.id)}`,patch,session.idToken);}catch(_){ }
  const set=type==="leave"?setLeaves:setAdvances;set(a=>a.map(x=>x.id===r.id?{...x,...patch}:x));
+ await writeAudit(session.idToken,{action:`${type}_${status}`,entity:type,requestId:r.id,employeeId:r.employeeId,employeeName:r.employeeName||employees.find(e=>employeeMatchesRecord(e,r))?.name||"",details:{reason:reasonText,by:profile?.name||"المشرف",amount:r.amount||null}});
  try{const nid=uid(),msg=isRejected?`تم رفض طلب ${type==="advance"?"السلفة":"الإجازة"}. السبب: ${reasonText}`:`تمت الموافقة على طلب ${type==="advance"?"السلفة":"الإجازة"}.`;await notifyEmployee(r.employeeId,r.authUid,{id:nid,title:type==="leave"?"تحديث طلب الإجازة":"تحديث طلب السلفة",message:msg,type,target:type==="leave"?"leaves":"advances",action:"open",createdAt:Date.now(),read:false,requestId:String(r.id),advanceId:type==="advance"?String(r.id):undefined,status,payload:{requestId:String(r.id),advanceId:type==="advance"?String(r.id):undefined,id:String(r.id),rejectionReason:reasonText,target:type==="leave"?"leaves":"advances",action:"open",systemVersion:type==="leave"?undefined:ADVANCE_SYSTEM_VERSION},systemVersion:type==="leave"?undefined:ADVANCE_SYSTEM_VERSION})}catch(e){}
 };;;if(loading)return h("div",{className:"app-bg min-h-screen grid place-items-center p-6"},h("div",{className:"glass rounded-3xl p-7 text-center max-w-md w-full"},[h("div",{className:"w-full flex justify-center"},h(Logo,{large:true})),h("div",{className:"font-black text-xl mt-4"},"جاري تجهيز النظام…"),h("div",{className:"muted text-sm mt-2"},"يتم التحقق من الحساب وتحميل البيانات الأساسية."),h("div",{className:"mt-5 h-1.5 rounded-full bg-white/10 overflow-hidden"},h("div",{className:"h-full bg-cyan-400 rounded-full animate-pulse",style:{width:"62%"}}))]));if(!session)return h(Login,{onLogin:login});if(!profile)return h("div",{className:"app-bg min-h-screen grid place-items-center p-6"},h("div",{className:"glass rounded-3xl p-7 text-center max-w-md w-full"},h(Logo,{large:true}),h("div",{className:"font-black text-xl mt-4"},"جارٍ تجهيز الحساب…")));const adminRole=["admin","supervisor","manager"].includes(String(profile.role||session.role||"").toLowerCase());return adminRole?h(Admin,{profile,token:session.idToken,employees,branches,attendance,advances,leaves,locationIncidents,payrollAdjustments,onLogout:logout,onAddEmployee:addEmp,onUpdateEmployee:updateEmp,onDeactivate:deactivate,onSaveBranch:saveBranch,onAddBranch:addBranch,onDeleteBranch:deleteBranch,onDecision:(r,s)=>decision(r,s,"advance"),onLeaveDecision:(r,s)=>decision(r,s,"leave"),onUpdateAttendance:updateAttendance,onRepairPhotos:repairAllEmployeePhotos,onRepairAttendance:repairAttendanceHistory,onRepairPayroll:repairImportedPayroll,notifications,onNotificationOpen:openNotification,onManageAdvance:manageAdvance,onRestoreEmployee:restoreEmployee,onCleanupEmployeeData:cleanupEmployeeData,onClearCurrentArchive:clearCurrentArchive,onMigratePhotos:migratePhotosOutOfEmployees,onLoadSection:(section)=>loadHeavy(session,section),onSavePayrollAdjustment:savePayrollAdjustment,onSupervisorCheckout:supervisorCheckout,onResetLegacyAdvances:resetLegacyAdvances}):h(Employee,{user:profile,branch,branches,attendance:attendance.filter(a=>employeeMatchesRecord(profile,a)),advances:advances.filter(a=>employeeMatchesRecord(profile,a)),leaves:leaves.filter(a=>employeeMatchesRecord(profile,a)),payrollAdjustment:payrollAdjustments.find(x=>employeeMatchesRecord(profile,x)&&String(x.month||"")===monthKey(today()))||null,notifications,onNotificationOpen:openNotification,onAttendance:addAttendance,onAdvance:addAdvance,onSettlement:addSettlement,onLeave:addLeave,onLogout:logout,token:session.idToken})}
 class AppErrorBoundary extends React.Component{
