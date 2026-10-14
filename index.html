@@ -201,7 +201,6 @@ const ADVANCE_EMPLOYEE_INDEX_STORE = "advanceRequestsByEmployeeV5";
 const LEAVE_SYSTEM_VERSION = "5.0.0";
 const LEAVE_STORE = "leaveRequestsV5";
 const LEAVE_EMPLOYEE_INDEX_STORE = "leaveRequestsByEmployeeV5";
-const LEGACY_WORKFLOW_RESET_KEY = "tal_operational_rebuild_20261014_done";
 const AUTH_BASE = "https://identitytoolkit.googleapis.com/v1/accounts";
 const REFRESH_BASE = "https://securetoken.googleapis.com/v1/token";
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -291,39 +290,6 @@ async function fbGetShallow(path, token) { const t=tokenOf(token); const r=await
 async function fbPut(path, data, token) { const t=tokenOf(token); const r=await fetch(`${DB_URL}/${path}.json?auth=${encodeURIComponent(t)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); if(r.status===401) throw Error("AUTH_EXPIRED"); if(!r.ok) throw Error("Database write failed"); return r.json(); }
 async function fbPatch(path, data, token) { const t=tokenOf(token); const r=await fetch(`${DB_URL}/${path}.json?auth=${encodeURIComponent(t)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); if(r.status===401) throw Error("AUTH_EXPIRED"); if(!r.ok) throw Error("Database update failed"); return r.json(); }
 async function fbDelete(path, token) { const t=tokenOf(token); const r=await fetch(`${DB_URL}/${path}.json?auth=${encodeURIComponent(t)}`, { method: "DELETE" }); if(r.status===401) throw Error("AUTH_EXPIRED"); if(!r.ok) throw Error(`Database delete failed (${r.status})`); return true; }
-async function purgeOperationalDataForRebuild(token){
-  const markerPath="systemMigrations/tal_operational_reset_20261014";
-  let marker=null;
-  try{marker=await fbGet(markerPath,token)}catch(e){throw Error("تعذر التحقق من حالة تهيئة قاعدة البيانات: "+(e?.message||e))}
-  if(marker?.status==="done")return false;
-  // نثبت حالة العملية أولاً حتى لا يعيد جهاز آخر مسح البيانات بعد اكتمال التهيئة.
-  try{await fbPut(markerPath,{status:"running",startedAt:marker?.startedAt||Date.now(),version:"2026-10-14",preserved:["employees","branches","settings","employeePhotos","firebase-auth-accounts"]},token)}catch(e){throw Error("تعذر تسجيل عملية التهيئة بأمان؛ لم يتم مسح أي بيانات. "+(e?.message||e))}
-  const operationalRoots=[
-    "attendance","advances","advancesV5","advanceRequests","advanceRequestsV5","advanceInbox","advanceInboxV5",
-    "advanceRequestsByEmployee","advanceRequestsByEmployeeV5","leaves","leaveRequestsV5","leaveRequestsByEmployeeV5",
-    "payrollAdjustments","notifications","locationIncidents","attendanceSecurity","auditLogs"
-  ];
-  const failures=[];
-  for(const root of operationalRoots){try{await fbDelete(root,token)}catch(e){failures.push(root);console.warn("operational data reset failed",root,e?.message||e)}}
-  // حذف الطلبات الاحتياطية القديمة من داخل ملف الموظف دون المساس بباقي ملفه أو بحساب الدخول.
-  try{
-    const employeeTree=await fbGet("employees",token);
-    for(const [employeeKey,employee] of Object.entries(employeeTree||{})){
-      if(employee?.advanceRequests&&typeof employee.advanceRequests==="object"){
-        const path=`employees/${encodeURIComponent(employeeKey)}/advanceRequests`;
-        try{await fbDelete(path,token)}catch(e){failures.push(path);console.warn("nested advance cleanup failed",path,e?.message||e)}
-      }
-    }
-  }catch(e){failures.push("employees/*/advanceRequests");console.warn("could not inspect employee-owned advance requests",e?.message||e)}
-  if(failures.length){
-    try{await fbPatch(markerPath,{status:"partial",failedRoots:failures,updatedAt:Date.now()},token)}catch(_){}
-    throw Error("لم يكتمل تنظيف بيانات التشغيل. تعذر مسح المسارات: "+failures.join("، "));
-  }
-  try{await fbPatch(markerPath,{status:"done",completedAt:Date.now(),clearedRoots:operationalRoots},token)}catch(e){throw Error("تم مسح بيانات التشغيل لكن تعذر تثبيت علامة الاكتمال. لا تتابع استخدام التطبيق قبل مراجعة حالة التهيئة.")}
-  try{Object.keys(localStorage).filter(k=>k.startsWith("tal_pending_advance_")).forEach(k=>localStorage.removeItem(k))}catch(e){}
-  return true;
-}
-
 function flatten(obj) {
   if(!obj) return [];
   const out=[];
@@ -1365,13 +1331,8 @@ useEffect(()=>{(async()=>{
 useEffect(()=>{if(!session)return;let busy=false;const refreshData=async()=>{if(busy)return;busy=true;try{await loadHeavy(session,isManagementRole(session.role)?"none":"all");await loadNotifications(session)}catch(e){if(e?.message==="AUTH_EXPIRED"&&session.refreshToken){try{const r=await refresh(session.refreshToken);const ns={...session,idToken:r.idToken,refreshToken:r.refreshToken,uid:session.uid,email:session.email,role:session.role};setSession(ns);localStorage.setItem("tal_session",JSON.stringify({refreshToken:r.refreshToken,email:session.email||"",role:session.role||"employee"}));await load(ns);await loadHeavy(ns,isManagementRole(ns.role)?"none":"all");await loadNotifications(ns)}catch(_){}}}finally{busy=false}};refreshData();const id=setInterval(refreshData,30000);const vis=()=>{if(document.visibilityState==="visible")refreshData()};document.addEventListener("visibilitychange",vis);return()=>{clearInterval(id);document.removeEventListener("visibilitychange",vis)}},[session,load,loadHeavy]);
 useEffect(()=>{if(!session)return;let timer=null;const trigger=()=>{clearTimeout(timer);timer=setTimeout(()=>loadNotifications(session).catch(()=>{}),180)};const pkey=profile?.id;const employeePath=isManagementRole(profile?.role)?"employees":`employees/${encodeURIComponent(pkey||session.uid)}`;const notificationKeys=[session.uid,pkey,profile?.authUid,profile?.employeeId,profile?.userId].filter((v,i,a)=>v&&a.indexOf(String(v))===i).map(String);const notificationPaths=notificationKeys.map(key=>`notifications/${encodeURIComponent(key)}`);if(isManagementRole(profile?.role)){notificationPaths.push(ADVANCE_STORE);notificationPaths.push(ADVANCE_INBOX_STORE);}const stops=[employeePath,...notificationPaths].map(path=>startFirebaseStream(path,session.idToken,trigger));return()=>{clearTimeout(timer);stops.forEach(fn=>fn&&fn())}},[session,load,profile?.role,profile?.id]);
 useEffect(()=>{if(!session?.uid)return;const e=isManagementRole(session.role)?employees.find(x=>String(x.id)===String(session.uid)||String(x.authUid||"")===String(session.uid)):employees.find(x=>String(x.id)===String(session.uid)||String(x.authUid||"")===String(session.uid)||(session.email&&String(x.email||"").toLowerCase()===String(session.email||"").toLowerCase()));if(e){const isAdminSession=String(session.role||"").toLowerCase()==="admin"||String(session.role||"").toLowerCase()==="supervisor"||String(session.role||"").toLowerCase()==="manager";if(isAdminSession&&!(["admin","supervisor","manager"].includes(String(e.role||"").toLowerCase())))return;setProfile(p=>({...p,...e,role:isAdminSession?(p?.role||session.role):e.role,authUid:session.uid,photoData:photoOf(e)||photoOf(p)||""}))}},[employees,session?.uid]);
-useEffect(()=>{
- if(!session?.idToken||!profile||!isManagementRole(profile.role))return;
- try{if(localStorage.getItem(LEGACY_WORKFLOW_RESET_KEY)==="1")return}catch(e){}
- let cancelled=false;
- purgeOperationalDataForRebuild(session.idToken).then(didReset=>{if(cancelled)return;try{localStorage.setItem(LEGACY_WORKFLOW_RESET_KEY,"1")}catch(e){};if(didReset){setAttendance([]);setAdvances([]);setLeaves([]);setLocationIncidents([]);setPayrollAdjustments([]);setNotifications([]);alert("اكتملت تهيئة Tal Al Baraka بنجاح. تم مسح بيانات التشغيل القديمة فقط، مع الاحتفاظ بحسابات الدخول والموظفين والفروع وإعداداتها وصور الموظفين.");}}).catch(e=>{if(!cancelled)alert("لم تكتمل تهيئة بيانات التشغيل: "+(e?.message||e));});
- return()=>{cancelled=true};
-},[session?.idToken,profile?.id,profile?.role]);
+// SAFETY: لا تُنفّذ أي عملية حذف لبيانات التشغيل تلقائيًا عند تسجيل دخول المشرف.
+// وظيفة purgeOperationalDataForRebuild متروكة دون استدعاء؛ لا تُشغّل إلا بإجراء صيانة صريح وبعد نسخة احتياطية.
 const logout=()=>{setSession(null);setProfile(null);localStorage.removeItem("tal_session")};const branch=branches.find(b=>b.id===profile?.branchId)||branches[0]||DEFAULT_BRANCH;const addAttendance=async({type,selfie,distance,lat,lng,securityEvent,securityReason,accuracy,locationTimestamp})=>{
  const date=today(),stamp=now(),activeBranch=branches.find(b=>b.id===profile?.branchId)||branch;
  if(securityEvent){
