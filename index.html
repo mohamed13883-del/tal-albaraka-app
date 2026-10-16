@@ -794,7 +794,7 @@ function AdvanceManager({items,employees,onUpdate}){
       ])):h("div",{className:"muted text-sm"},"لا يوجد سجل تفصيلي محفوظ لهذه السلفة حتى الآن.")
     ]),
     editing&&editing.id===a.id&&canManage?h("div",{className:"grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 p-3 rounded-xl bg-black/10"},[
-     h("input",{className:"field",type:"number",min:2,max:18,placeholder:"عدد الأقساط الجديدة (2-18)",defaultValue:a.remainingInstallments||a.installmentsCount||1,id:`inst-${a.id}`}),
+     h("input",{className:"field",type:"number",min:2,max:18,placeholder:"عدد الأقساط الجديدة (1-18)",defaultValue:a.remainingInstallments||a.installmentsCount||1,id:`inst-${a.id}`}),
      h("input",{className:"field",type:"number",min:0,placeholder:"المتبقي الجديد",defaultValue:rem,id:`bal-${a.id}`}),
      h("div",{className:"flex gap-2"},[
       h(Btn,{onClick:()=>{const n=Math.max(2,Math.min(18,Number(document.getElementById(`inst-${a.id}`).value)||2)),bal=Math.max(0,Number(document.getElementById(`bal-${a.id}`).value)||0);if(!window.confirm(`تأكيد إعادة تقسيم المتبقي ${money(bal)} ريال على ${n} أقساط؟`))return;onUpdate(a,{action:"resplit",installments:n,remainingBalance:bal});setEditing(null)},children:"حفظ التقسيم"}),
@@ -1460,15 +1460,22 @@ const addAdvance=async({amount,installments})=>{
  const resolvedName=String(profile?.name||profile?.fullName||profile?.employeeName||profile?.displayName||employeeRecord?.name||employeeRecord?.fullName||employeeRecord?.employeeName||employeeRecord?.displayName||session.displayName||"").trim();
  if(!resolvedName){alert("تعذر تحديد اسم الموظف من بيانات الحساب. لم يتم إرسال الطلب حتى لا يُحفظ باسم بدون اسم. يرجى تسجيل الخروج والدخول مجددًا أو مراجعة ملف الموظف في قاعدة البيانات.");return false;}
  const id=uid(),requestDate=today(),authUid=profile?.authUid||session.uid,createdAt=Date.now();
- const r={id,employeeId:canonicalId,authUid,employeeName:resolvedName,employeeEmail:profile?.email||session.email||employeeRecord?.email||"",advanceId:id,systemVersion:ADVANCE_SYSTEM_VERSION,requestType:"advance",amount:numericAmount,installmentsCount:n,installmentAmount:Math.round(numericAmount/n*100)/100,remainingInstallments:n,remainingBalance:numericAmount,paidAmount:0,status:"pending",requestDate,createdAt,updatedAt:createdAt,managementHistory:[{action:"request",date:requestDate,by:resolvedName||"الموظف",amount:numericAmount,installments:n}]};
+ const r={id,employeeId:canonicalId,authUid,employeeName:resolvedName,employeeEmail:profile?.email||session.email||employeeRecord?.email||"",advanceId:id,systemVersion:ADVANCE_SYSTEM_VERSION,requestType:"advance",amount:numericAmount,installmentsCount:n,installmentStartMonth:String(requestDate).slice(0,7),installmentAmount:Math.round(numericAmount/n*100)/100,remainingInstallments:n,remainingBalance:numericAmount,paidAmount:0,status:"pending",requestDate,createdAt,updatedAt:createdAt,managementHistory:[{action:"request",date:requestDate,by:resolvedName||"الموظف",amount:numericAmount,installments:n}]};
  const keys=[session.uid,canonicalId,authUid].filter((v,i,arr)=>v&&arr.indexOf(String(v))===i).map(String);
  let rootSaved=false;
  // المسار المركزي أولاً: هذا هو المصدر الذي يقرأه المشرف لطلبات السلف.
  try{
   const rootPath=`${ADVANCE_REQUEST_STORE}/${encodeURIComponent(id)}`;
+  // نجاح PUT من Firebase يعني أن الكتابة المركزية قُبلت؛ لا نجعل فشل القراءة اللاحقة
+  // بسبب صلاحيات قراءة منفصلة أو تأخير مؤقت يلغي نجاح الحفظ ويضلل الموظف.
   await fbPut(rootPath,r,session.idToken);
-  const verifyRoot=await fbGet(rootPath,session.idToken);
-  rootSaved=!!(verifyRoot&&String(verifyRoot.id)===String(id));
+  rootSaved=true;
+  try{
+   const verifyRoot=await fbGet(rootPath,session.idToken);
+   if(verifyRoot&&typeof verifyRoot==="object"&&!verifyRoot.id){
+    console.warn("Central advance record was written but returned without its id field");
+   }
+  }catch(verifyError){console.warn("Central advance write accepted; read-back verification unavailable",verifyError?.message||verifyError)}
  }catch(e){console.warn("central advance request write failed",e?.message||e)}
  // نسخة مفهرسة تحت الموظف: تسمح للموظف باستعادة الطلب بعد تحديث الصفحة دون قراءة طلبات الموظفين الآخرين.
  try{await fbPut(`${ADVANCE_EMPLOYEE_INDEX_STORE}/${encodeURIComponent(canonicalId)}/${encodeURIComponent(id)}`,r,session.idToken)}catch(e){console.warn("employee advance index write failed",e?.message||e)}
@@ -1667,7 +1674,7 @@ const manageAdvance=async(a,change)=>{
    }catch(e){console.warn("advance approval preflight failed",e?.message||e)}
  }
  const path=type==="leave"?LEAVE_STORE:ADVANCE_STORE,isRejected=status==="rejected",reasonText=String(reason||"").trim(),history=type==="advance"?[...(r.managementHistory||[]),{action:status==="approved"?"approved":"rejected",date:today(),by:profile?.name||"المشرف",amount:Number(r.amount)||0,...(isRejected?{reason:reasonText}:{})}]:null;
- const patch=type==="advance"?{status,managementHistory:history,updatedAt:Date.now(),systemVersion:ADVANCE_SYSTEM_VERSION,...(status==="approved"?{disbursedAt:Date.now(),disbursedBy:profile?.name||"المشرف",disbursementStatus:"paid",remainingBalance:Number(r.amount)||0,remainingInstallments:Number(r.installmentsCount||r.installments||0)}:{ } ),...(isRejected?{rejectionReason:reasonText,rejectedAt:Date.now(),rejectedBy:profile?.name||"المشرف"}:{})}:{status,updatedAt:Date.now(),systemVersion:LEAVE_SYSTEM_VERSION,...(isRejected?{rejectionReason:reasonText,rejectedAt:Date.now(),rejectedBy:profile?.name||"المشرف"}:{})};
+ const patch=type==="advance"?{status,managementHistory:history,updatedAt:Date.now(),systemVersion:ADVANCE_SYSTEM_VERSION,...(status==="approved"?{disbursedAt:Date.now(),disbursedBy:profile?.name||"المشرف",disbursementStatus:"paid",installmentStartMonth:r.installmentStartMonth||String(r.requestDate||today()).slice(0,7),remainingBalance:Number(r.amount)||0,remainingInstallments:Number(r.installmentsCount||r.installments||0)}:{ } ),...(isRejected?{rejectionReason:reasonText,rejectedAt:Date.now(),rejectedBy:profile?.name||"المشرف"}:{})}:{status,updatedAt:Date.now(),systemVersion:LEAVE_SYSTEM_VERSION,...(isRejected?{rejectionReason:reasonText,rejectedAt:Date.now(),rejectedBy:profile?.name||"المشرف"}:{})};
  const keys=[r.employeeId,r.authUid,r.uid,r.userId,r.employeeKey,r.legacyEmployeeId].filter((v,i,arr)=>v&&arr.indexOf(v)===i).map(String);
  await Promise.allSettled(keys.map(key=>fbPatch(`${path===LEAVE_STORE?`${LEAVE_STORE}/byEmployee`:path}/${encodeURIComponent(key)}/${encodeURIComponent(r.id)}`,patch,session.idToken)));
  if(type==="advance"){
