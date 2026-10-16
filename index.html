@@ -758,7 +758,7 @@ function employeeSort(list,mode,branchFilter){
 function AdvanceManager({items,employees,onUpdate}){
  const [filter,setFilter]=useState("all"),[editing,setEditing]=useState(null),[historyOpen,setHistoryOpen]=useState(null);
  const rows=(items||[]).filter(a=>filter==="all"||a.status===filter);
- const emp=a=>employees.find(e=>employeeMatchesRecord(e,a));
+ const emp=a=>employees.find(e=>employeeMatchesRecord(e,a))||employees.find(e=>[a?.employeeId,a?.authUid,a?.uid,a?.userId,a?.employeeCode].filter(Boolean).some(id=>[e?.id,e?.authUid,e?.uid,e?.userId,e?.employeeId,e?.employeeCode].filter(Boolean).map(String).includes(String(id))))||employees.find(e=>{const ae=String(a?.employeeEmail||a?.email||"").trim().toLowerCase(),ee=String(e?.email||"").trim().toLowerCase();return !!ae&&ae===ee});
  const remaining=a=>Math.max(0,Number(a.remainingBalance??((a.remainingInstallments||0)*(a.installmentAmount||0))));
  const statusLabel=a=>a.status==="pending"?"قيد المراجعة":a.status==="approved"?"نشطة":a.status==="rejected"?"مرفوضة":"مغلقة";
  return h(Card,null,[
@@ -771,7 +771,7 @@ function AdvanceManager({items,employees,onUpdate}){
    return h("div",{key:`${a.employeeId}-${a.id}`,className:"pill rounded-2xl p-3 sm:p-4"},[
     h("div",{className:"flex flex-col sm:flex-row justify-between gap-3"},[
      h("div",{className:"min-w-0"},[
-      h("div",{className:"flex flex-wrap items-center gap-2"},h("div",{className:"font-bold truncate"},emp(a)?.name||a.employeeId),h(Badge,{tone:a.status==="approved"?"green":a.status==="pending"?"amber":a.status==="rejected"?"red":"blue",children:statusLabel(a)})),
+      h("div",{className:"flex flex-wrap items-center gap-2"},h("div",{className:"font-bold truncate"},emp(a)?.name||a.employeeName||a.employeeEmail||a.employeeId||"بدون اسم"),h(Badge,{tone:a.status==="approved"?"green":a.status==="pending"?"amber":a.status==="rejected"?"red":"blue",children:statusLabel(a)})),
       h("div",{className:"text-sm muted mt-1"},`السلفة الأصلية: ${money(a.amount)} • المتبقي: ${money(rem)}`),
       h("div",{className:"text-xs muted mt-1"},`الأقساط: ${a.installmentsCount||0} • القسط الحالي: ${money(a.installmentAmount||0)} • المتبقي: ${a.remainingInstallments||0}`),
       h("div",{className:"text-xs text-emerald-300 mt-1"},`تم سداده: ${money(a.paidAmount||0)} ريال`),h("div",{className:"mt-2 h-1.5 rounded-full bg-white/10 overflow-hidden"},h("div",{className:"h-full rounded-full bg-emerald-400",style:{width:`${Math.max(0,Math.min(100,((Number(a.paidAmount)||0)/(Number(a.amount)||1))*100))}%`}})),
@@ -1451,8 +1451,10 @@ const addAdvance=async({amount,installments})=>{
  }catch(e){console.warn("advance preflight read failed",e?.message||e)}
  if(existing){alert(existing.status==="pending"?"تم تقديم طلب السلفة بالفعل وهو قيد مراجعة المشرف. لا يمكن تقديم طلب جديد قبل صدور الموافقة أو الرفض.":"لديك سلفة تمت الموافقة عليها ولم تُسدَّد بالكامل بعد. لا يمكن تقديم سلفة جديدة إلا بعد إغلاق السلفة الحالية بسداد كامل المتبقي.");return false;}
  const n=Math.max(2,Math.min(18,Number(installments)||2)),numericAmount=Number(amount)||0;if(!(numericAmount>0))return false;
+ const employeeRecord=(employees||[]).find(e=>[e?.id,e?.uid,e?.authUid,e?.userId,e?.employeeId].filter(Boolean).map(String).includes(String(canonicalId))||[e?.id,e?.uid,e?.authUid,e?.userId,e?.employeeId].filter(Boolean).map(String).includes(String(session.uid)))||(employees||[]).find(e=>String(e?.email||"").trim().toLowerCase()===String(profile?.email||session.email||"").trim().toLowerCase());
+ const resolvedName=String(profile?.name||profile?.fullName||profile?.employeeName||employeeRecord?.name||employeeRecord?.fullName||employeeRecord?.employeeName||session.displayName||session.email||"").trim();
  const id=uid(),requestDate=today(),authUid=profile?.authUid||session.uid,createdAt=Date.now();
- const r={id,employeeId:canonicalId,authUid,employeeName:profile?.name||"",employeeEmail:profile?.email||session.email||"",advanceId:id,systemVersion:ADVANCE_SYSTEM_VERSION,requestType:"advance",amount:numericAmount,installmentsCount:n,installmentAmount:Math.round(numericAmount/n*100)/100,remainingInstallments:n,remainingBalance:numericAmount,paidAmount:0,status:"pending",requestDate,createdAt,updatedAt:createdAt,managementHistory:[{action:"request",date:requestDate,by:profile?.name||"الموظف",amount:numericAmount,installments:n}]};
+ const r={id,employeeId:canonicalId,authUid,employeeName:resolvedName,employeeEmail:profile?.email||session.email||employeeRecord?.email||"",advanceId:id,systemVersion:ADVANCE_SYSTEM_VERSION,requestType:"advance",amount:numericAmount,installmentsCount:n,installmentAmount:Math.round(numericAmount/n*100)/100,remainingInstallments:n,remainingBalance:numericAmount,paidAmount:0,status:"pending",requestDate,createdAt,updatedAt:createdAt,managementHistory:[{action:"request",date:requestDate,by:resolvedName||"الموظف",amount:numericAmount,installments:n}]};
  const keys=[session.uid,canonicalId,authUid].filter((v,i,arr)=>v&&arr.indexOf(String(v))===i).map(String);
  let rootSaved=false;
  // المسار المركزي أولاً: هذا هو المصدر الذي يقرأه المشرف لطلبات السلف.
@@ -1494,7 +1496,7 @@ const addAdvance=async({amount,installments})=>{
  setAdvances(a=>[...a.filter(x=>String(x.id)!==String(id)),r]);
  await writeAudit(session.idToken,{action:"advance_requested",entity:"advance",requestId:id,employeeId:canonicalId,employeeName:r.employeeName,details:{amount:numericAmount,installments:n,installmentAmount:r.installmentAmount}});
  const managerCount=await notifySupervisors("advance",{employeeName:r.employeeName,amount:numericAmount,installments:n,requestDate,id,requestId:id,advanceId:id,employeeId:canonicalId,authUid,systemVersion:ADVANCE_SYSTEM_VERSION});
- if(!managerCount){console.warn("No active supervisor notification target was found; the request remains saved in the shared request store.");setTimeout(()=>alert("تم حفظ طلب السلفة، لكن تعذر تسجيل إشعار المشرف. سيظهر الطلب في شاشة إدارة السلف عند تحديثها."),0)}
+ if(!managerCount){console.warn("تم حفظ طلب السلفة، لكن تعذر حفظ إشعار المشرف. سيظهر الطلب في إدارة السلف عند تحديثها إذا كانت صلاحيات القراءة تسمح بذلك.");setTimeout(()=>alert("تم حفظ طلب السلفة. تعذر تسجيل إشعار فوري للمشرف، لكن الطلب محفوظ؛ يرجى من المشرف تحديث شاشة إدارة السلف. إذا لم يظهر، فيلزم مراجعة صلاحيات Firebase.") ,0)}
  return true;
 };const addSettlement=async(a,{amount})=>{
  if(!amount)return false;
