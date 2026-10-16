@@ -1451,8 +1451,14 @@ const addAdvance=async({amount,installments})=>{
  }catch(e){console.warn("advance preflight read failed",e?.message||e)}
  if(existing){alert(existing.status==="pending"?"تم تقديم طلب السلفة بالفعل وهو قيد مراجعة المشرف. لا يمكن تقديم طلب جديد قبل صدور الموافقة أو الرفض.":"لديك سلفة تمت الموافقة عليها ولم تُسدَّد بالكامل بعد. لا يمكن تقديم سلفة جديدة إلا بعد إغلاق السلفة الحالية بسداد كامل المتبقي.");return false;}
  const n=Math.max(2,Math.min(18,Number(installments)||2)),numericAmount=Number(amount)||0;if(!(numericAmount>0))return false;
- const employeeRecord=(employees||[]).find(e=>[e?.id,e?.uid,e?.authUid,e?.userId,e?.employeeId].filter(Boolean).map(String).includes(String(canonicalId))||[e?.id,e?.uid,e?.authUid,e?.userId,e?.employeeId].filter(Boolean).map(String).includes(String(session.uid)))||(employees||[]).find(e=>String(e?.email||"").trim().toLowerCase()===String(profile?.email||session.email||"").trim().toLowerCase());
- const resolvedName=String(profile?.name||profile?.fullName||profile?.employeeName||employeeRecord?.name||employeeRecord?.fullName||employeeRecord?.employeeName||session.displayName||session.email||"").trim();
+ let employeeRecord=(employees||[]).find(e=>[e?.id,e?.uid,e?.authUid,e?.userId,e?.employeeId].filter(Boolean).map(String).includes(String(canonicalId))||[e?.id,e?.uid,e?.authUid,e?.userId,e?.employeeId].filter(Boolean).map(String).includes(String(session.uid)))||(employees||[]).find(e=>String(e?.email||"").trim().toLowerCase()===String(profile?.email||session.email||"").trim().toLowerCase());
+ // لا نعتمد على كائن profile وحده؛ قد لا يحمل الاسم في جلسة الموظف بعد تسجيل الدخول.
+ if(!employeeRecord){
+  const lookups=[canonicalId,session.uid,profile?.authUid,profile?.employeeId,profile?.userId].filter((v,i,a)=>v&&a.indexOf(v)===i);
+  for(const key of lookups){try{const candidate=await fbGet(`employees/${encodeURIComponent(String(key))}`,session.idToken);if(candidate&&typeof candidate==="object"){employeeRecord=candidate;break;}}catch(e){console.warn("employee name lookup failed",e?.message||e)}}
+ }
+ const resolvedName=String(profile?.name||profile?.fullName||profile?.employeeName||profile?.displayName||employeeRecord?.name||employeeRecord?.fullName||employeeRecord?.employeeName||employeeRecord?.displayName||session.displayName||"").trim();
+ if(!resolvedName){alert("تعذر تحديد اسم الموظف من بيانات الحساب. لم يتم إرسال الطلب حتى لا يُحفظ باسم بدون اسم. يرجى تسجيل الخروج والدخول مجددًا أو مراجعة ملف الموظف في قاعدة البيانات.");return false;}
  const id=uid(),requestDate=today(),authUid=profile?.authUid||session.uid,createdAt=Date.now();
  const r={id,employeeId:canonicalId,authUid,employeeName:resolvedName,employeeEmail:profile?.email||session.email||employeeRecord?.email||"",advanceId:id,systemVersion:ADVANCE_SYSTEM_VERSION,requestType:"advance",amount:numericAmount,installmentsCount:n,installmentAmount:Math.round(numericAmount/n*100)/100,remainingInstallments:n,remainingBalance:numericAmount,paidAmount:0,status:"pending",requestDate,createdAt,updatedAt:createdAt,managementHistory:[{action:"request",date:requestDate,by:resolvedName||"الموظف",amount:numericAmount,installments:n}]};
  const keys=[session.uid,canonicalId,authUid].filter((v,i,arr)=>v&&arr.indexOf(String(v))===i).map(String);
@@ -1485,18 +1491,21 @@ const addAdvance=async({amount,installments})=>{
    employeeNodeSaved=!!(verify&&String(verify.id)===String(id));
   }catch(e){console.warn("employee-node advance write failed",e?.message||e)}
  }
- if(!rootSaved&&!aliasSaved&&!employeeNodeSaved){
-  const message="تعذر حفظ طلب السلفة في قاعدة البيانات. لم يتم إرسال الطلب للمشرف. يرجى التأكد من اتصال الإنترنت وصلاحيات قاعدة البيانات ثم المحاولة مرة أخرى.";
-  try{localStorage.setItem(`tal_pending_advance_${id}`,JSON.stringify(r));}catch(_){}
+ // لا نعتبر الطلب محفوظًا نهائيًا إلا إذا ثبت وجوده في المصدر المركزي الذي يقرأه المشرف.
+ // الكتابة في نسخة الموظف وحدها قد تجعل الطلب يختفي من لوحة المشرف أو بعد إعادة التحميل.
+ if(!rootSaved){
+  const message=aliasSaved||employeeNodeSaved
+   ?"تعذر تأكيد حفظ الطلب في سجل السلف المركزي. لم نعرضه كطلب مرسل للمشرف لتجنب اختفائه بعد تحديث الصفحة. يرجى المحاولة لاحقًا؛ لا تعِد الإرسال إذا ظهر الطلب في سجل السلف."
+   :"تعذر حفظ طلب السلفة في قاعدة البيانات. لم يتم إرسال الطلب. تحقق من الاتصال وصلاحيات Firebase ثم أعد المحاولة.";
   alert(message);
-  console.error("Advance save failed: no Firebase path accepted the request");
+  console.error("Advance request was not confirmed in the central Firebase store");
   return false;
  }
  try{localStorage.removeItem(`tal_pending_advance_${id}`);}catch(_){}
  setAdvances(a=>[...a.filter(x=>String(x.id)!==String(id)),r]);
  await writeAudit(session.idToken,{action:"advance_requested",entity:"advance",requestId:id,employeeId:canonicalId,employeeName:r.employeeName,details:{amount:numericAmount,installments:n,installmentAmount:r.installmentAmount}});
  const managerCount=await notifySupervisors("advance",{employeeName:r.employeeName,amount:numericAmount,installments:n,requestDate,id,requestId:id,advanceId:id,employeeId:canonicalId,authUid,systemVersion:ADVANCE_SYSTEM_VERSION});
- if(!managerCount){console.warn("تم حفظ طلب السلفة، لكن تعذر حفظ إشعار المشرف. سيظهر الطلب في إدارة السلف عند تحديثها إذا كانت صلاحيات القراءة تسمح بذلك.");setTimeout(()=>alert("تم حفظ طلب السلفة. تعذر تسجيل إشعار فوري للمشرف، لكن الطلب محفوظ؛ يرجى من المشرف تحديث شاشة إدارة السلف. إذا لم يظهر، فيلزم مراجعة صلاحيات Firebase.") ,0)}
+ if(!managerCount){console.warn("تم حفظ طلب السلفة في السجل المركزي، لكن تعذر تسجيل إشعار فوري للمشرف.");setTimeout(()=>alert("تم حفظ طلب السلفة في قاعدة البيانات. تعذر تسجيل الإشعار الفوري فقط؛ سيظهر الطلب عند تحديث لوحة المشرف أو إعادة فتح قسم إدارة السلف."),0)}
  return true;
 };const addSettlement=async(a,{amount})=>{
  if(!amount)return false;
